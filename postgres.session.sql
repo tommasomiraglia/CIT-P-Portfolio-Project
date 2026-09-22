@@ -1,15 +1,1 @@
-SELECT * FROM title_principals;
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+SELECT * FROM title_basics;
