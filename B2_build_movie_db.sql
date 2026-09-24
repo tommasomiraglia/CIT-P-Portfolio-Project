@@ -123,6 +123,12 @@ CREATE TABLE title_ratings (
     numvotes        INTEGER
 );
 
+CREATE TABLE name_ratings (
+    nconst          VARCHAR(10) PRIMARY KEY REFERENCES name_basics (nconst),
+    averagerating   NUMERIC(5,1),
+    agg_numvotes    INTEGER
+);
+
 CREATE TABLE title_episode (
     episodeid       VARCHAR(10) PRIMARY KEY REFERENCES title_basic (tconst),
     parentconst     VARCHAR(10) NOT NULL REFERENCES title_basic (tconst),
@@ -420,6 +426,17 @@ CROSS JOIN LATERAL unnest(
 WHERE rtp.characters IS NOT NULL
   AND rtp.characters <> '\N'
   AND trim(both '"' from ch.val) <> '';
+
+-- 4j. name_ratings (derived: weighted avg rating / total votes across a
+--     person's titles, computed only after title_principals is populated)
+INSERT INTO name_ratings (nconst, averagerating, agg_numvotes)
+SELECT
+    tp.nconst,
+    ROUND(SUM(tr.averagerating * tr.numvotes) / NULLIF(SUM(tr.numvotes), 0), 1) AS averagerating,
+    SUM(tr.numvotes) AS agg_numvotes
+FROM title_principals tp
+JOIN title_ratings tr ON tr.tconst = tp.tconst
+GROUP BY tp.nconst;
 
 DROP TABLE IF EXISTS raw_title_basics CASCADE;
 DROP TABLE IF EXISTS raw_title_akas CASCADE;
