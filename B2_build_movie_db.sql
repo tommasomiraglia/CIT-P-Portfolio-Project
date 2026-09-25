@@ -123,12 +123,6 @@ CREATE TABLE title_ratings (
     numvotes        INTEGER
 );
 
-CREATE TABLE name_ratings (
-    nconst          VARCHAR(10) PRIMARY KEY REFERENCES name_basics (nconst),
-    averagerating   NUMERIC(5,1),
-    agg_numvotes    INTEGER
-);
-
 CREATE TABLE title_episode (
     episodeid       VARCHAR(10) PRIMARY KEY REFERENCES title_basic (tconst),
     parentconst     VARCHAR(10) NOT NULL REFERENCES title_basic (tconst),
@@ -178,6 +172,12 @@ CREATE TABLE title_character (
     PRIMARY KEY (principalid, character)
 );
 
+CREATE TABLE name_ratings (
+    nconst          VARCHAR(10) PRIMARY KEY REFERENCES name_basics (nconst),
+    averagerating   NUMERIC(5,1),
+    agg_numvotes    INTEGER
+);
+
 --4 populate table
 INSERT INTO title_basic_type (name)
 SELECT DISTINCT titletype
@@ -203,11 +203,7 @@ WHERE language IS NOT NULL;
 INSERT INTO category (name)
 SELECT DISTINCT category
 FROM raw_title_principals
-WHERE category IS NOT NULL
-UNION
-SELECT 'director'
-UNION
-SELECT 'writer';
+WHERE category IS NOT NULL;
  
 INSERT INTO primaryprofession (name)
 SELECT DISTINCT trim(p.val)
@@ -233,7 +229,7 @@ SELECT
     tb.isadult,
     NULLIF(trim(tb.startyear), '\N')::SMALLINT,
     NULLIF(trim(tb.endyear), '\N')::SMALLINT,
-    tb.runtimeminutes,                          -- già integer, nessun NULLIF/cast necessario
+    tb.runtimeminutes,
     od.plot,
     od.poster
 FROM raw_title_basics tb
@@ -297,7 +293,7 @@ FROM raw_title_episode te
 WHERE EXISTS (SELECT 1 FROM title_basic tb WHERE tb.tconst = te.tconst)
   AND EXISTS (SELECT 1 FROM title_basic tb WHERE tb.tconst = te.parenttconst);
 
--- 4f. name_basics (solo dati anagrafici)
+-- 4f. name_basics
 INSERT INTO name_basics (nconst, primaryname, birthyear, deathyear)
 SELECT
     nb.nconst,
@@ -336,7 +332,7 @@ SELECT
     tp.nconst,
     c.categoryid,
     tp.job,
-    FALSE,  -- default starting value, may be updated to TRUE below
+    FALSE, 
     NULLIF(tp.ordering::TEXT, '\N')::INTEGER
 FROM raw_title_principals tp
 JOIN category c ON c.name = tp.category
@@ -371,44 +367,38 @@ WHERE tpn.categoryid = c.categoryid
         AND w.val = tpn.nconst
   );
 
--- 4h-iv. now insert ONLY the directors/writers NOT already present in raw_title_principals
+-- 4h-iv. insert directors/writers NOT already present in raw_title_principals
 INSERT INTO title_principals (tconst, nconst, categoryid, job, is_crew, ordering)
 SELECT DISTINCT
-    tcw.tconst,
-    d.val,
+    combined.tconst,
+    combined.nconst,
     c.categoryid,
     NULL,
     TRUE,
-    d.pos::INTEGER
-FROM raw_title_crew tcw
-CROSS JOIN LATERAL unnest(string_to_array(tcw.directors, ',')) WITH ORDINALITY AS d(val, pos)
-JOIN category c ON c.name = 'director'
-WHERE tcw.directors IS NOT NULL
-  AND EXISTS (SELECT 1 FROM title_basic tb WHERE tb.tconst = tcw.tconst)
-  AND EXISTS (SELECT 1 FROM name_basics nb WHERE nb.nconst = d.val)
+    combined.pos::INTEGER
+FROM (
+    SELECT tcw.tconst, d.val AS nconst, d.pos, 'director' AS role
+    FROM raw_title_crew tcw
+    CROSS JOIN LATERAL unnest(string_to_array(tcw.directors, ',')) WITH ORDINALITY AS d(val, pos)
+    WHERE tcw.directors IS NOT NULL
+
+    UNION ALL
+
+    SELECT tcw.tconst, w.val AS nconst, w.pos, 'writer' AS role
+    FROM raw_title_crew tcw
+    CROSS JOIN LATERAL unnest(string_to_array(tcw.writers, ',')) WITH ORDINALITY AS w(val, pos)
+    WHERE tcw.writers IS NOT NULL
+) AS combined
+JOIN category c ON c.name = combined.role
+WHERE EXISTS (SELECT 1 FROM title_basic tb WHERE tb.tconst = combined.tconst)
+  AND EXISTS (SELECT 1 FROM name_basics nb WHERE nb.nconst = combined.nconst)
   AND NOT EXISTS (
       SELECT 1 FROM raw_title_principals tp
-      WHERE tp.tconst = tcw.tconst AND tp.nconst = d.val AND tp.category = 'director'
+      WHERE tp.tconst = combined.tconst
+        AND tp.nconst = combined.nconst
+        AND tp.category = combined.role
   );
 
-INSERT INTO title_principals (tconst, nconst, categoryid, job, is_crew, ordering)
-SELECT DISTINCT
-    tcw.tconst,
-    w.val,
-    c.categoryid,
-    NULL,
-    TRUE,
-    w.pos::INTEGER
-FROM raw_title_crew tcw
-CROSS JOIN LATERAL unnest(string_to_array(tcw.writers, ',')) WITH ORDINALITY AS w(val, pos)
-JOIN category c ON c.name = 'writer'
-WHERE tcw.writers IS NOT NULL
-  AND EXISTS (SELECT 1 FROM title_basic tb WHERE tb.tconst = tcw.tconst)
-  AND EXISTS (SELECT 1 FROM name_basics nb WHERE nb.nconst = w.val)
-  AND NOT EXISTS (
-      SELECT 1 FROM raw_title_principals tp
-      WHERE tp.tconst = tcw.tconst AND tp.nconst = w.val AND tp.category = 'writer'
-  );
 -- 4i. title_character
 INSERT INTO title_character (principalid, character)
 SELECT DISTINCT
@@ -438,11 +428,12 @@ FROM title_principals tp
 JOIN title_ratings tr ON tr.tconst = tp.tconst
 GROUP BY tp.nconst;
 
-DROP TABLE IF EXISTS raw_title_basics CASCADE;
-DROP TABLE IF EXISTS raw_title_akas CASCADE;
-DROP TABLE IF EXISTS raw_title_principals CASCADE;
-DROP TABLE IF EXISTS raw_title_ratings CASCADE;
-DROP TABLE IF EXISTS raw_title_episode CASCADE;
-DROP TABLE IF EXISTS raw_title_crew CASCADE;
-DROP TABLE IF EXISTS raw_name_basics CASCADE;
+
+--DROP TABLE IF EXISTS raw_title_basics CASCADE;
+--DROP TABLE IF EXISTS raw_title_akas CASCADE;
+--DROP TABLE IF EXISTS raw_title_principals CASCADE;
+--DROP TABLE IF EXISTS raw_title_ratings CASCADE;
+--DROP TABLE IF EXISTS raw_title_episode CASCADE;
+--DROP TABLE IF EXISTS raw_title_crew CASCADE;
+--DROP TABLE IF EXISTS raw_name_basics CASCADE;
 --DROP TABLE IF EXISTS omdb_data CASCADE;
