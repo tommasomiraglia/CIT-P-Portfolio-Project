@@ -428,12 +428,11 @@ FROM title_principals tp
 JOIN title_ratings tr ON tr.tconst = tp.tconst
 GROUP BY tp.nconst;
 
-
---DROP TABLE IF EXISTS raw_title_basics CASCADE;
---DROP TABLE IF EXISTS raw_title_akas CASCADE;
---DROP TABLE IF EXISTS raw_title_principals CASCADE;
---DROP TABLE IF EXISTS raw_title_ratings CASCADE;
---DROP TABLE IF EXISTS raw_title_episode CASCADE;
---DROP TABLE IF EXISTS raw_title_crew CASCADE;
---DROP TABLE IF EXISTS raw_name_basics CASCADE;
---DROP TABLE IF EXISTS omdb_data CASCADE;
+DROP TABLE IF EXISTS raw_title_basics CASCADE;
+DROP TABLE IF EXISTS raw_title_akas CASCADE;
+DROP TABLE IF EXISTS raw_title_principals CASCADE;
+DROP TABLE IF EXISTS raw_title_ratings CASCADE;
+DROP TABLE IF EXISTS raw_title_episode CASCADE;
+DROP TABLE IF EXISTS raw_title_crew CASCADE;
+DROP TABLE IF EXISTS raw_name_basics CASCADE;
+DROP TABLE IF EXISTS omdb_data CASCADE;

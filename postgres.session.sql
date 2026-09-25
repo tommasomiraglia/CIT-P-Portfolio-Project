@@ -1,8 +1,9 @@
-SELECT COUNT(*) AS gruppi_con_ordering_duplicato
-FROM (
-    SELECT tconst, ordering
-    FROM title_principals
-    WHERE ordering IS NOT NULL
-    GROUP BY tconst, ordering
-    HAVING COUNT(*) > 1
-) AS duplicati;
+
+DROP TABLE IF EXISTS raw_title_basics CASCADE;
+DROP TABLE IF EXISTS raw_title_akas CASCADE;
+DROP TABLE IF EXISTS raw_title_principals CASCADE;
+DROP TABLE IF EXISTS raw_title_ratings CASCADE;
+DROP TABLE IF EXISTS raw_title_episode CASCADE;
+DROP TABLE IF EXISTS raw_title_crew CASCADE;
+DROP TABLE IF EXISTS raw_name_basics CASCADE;
+DROP TABLE IF EXISTS omdb_data CASCADE;
