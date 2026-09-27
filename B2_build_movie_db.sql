@@ -50,7 +50,6 @@ ALTER TABLE title_crew       RENAME TO raw_title_crew;
 ALTER TABLE name_basics      RENAME TO raw_name_basics;
 
 --NEW SCHEMA
-
 --1 small table
 CREATE TABLE title_basic_type (
     titletypeid   SERIAL PRIMARY KEY,
