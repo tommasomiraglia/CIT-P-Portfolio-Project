@@ -20,7 +20,7 @@ CREATE TABLE app_user (
 
 -- 2. Search history
 CREATE TABLE history (
-    userid   INTEGER   NOT NULL REFERENCES app_user (userid),
+    userid   INTEGER   NOT NULL REFERENCES app_user (userid) ON DELETE CASCADE,
     time     TIMESTAMP NOT NULL DEFAULT now(),
     value    TEXT,
     PRIMARY KEY (userid, time)
@@ -44,7 +44,7 @@ CREATE TABLE history_title_basic (
 
 -- 3. Rating history
 CREATE TABLE rating_history (
-    userid    INTEGER     NOT NULL REFERENCES app_user (userid),
+    userid    INTEGER     NOT NULL REFERENCES app_user (userid) ON DELETE CASCADE,
     tconst    VARCHAR(10) NOT NULL REFERENCES title_basic (tconst),
     value     SMALLINT    NOT NULL CHECK (value BETWEEN 1 AND 10),
     comment   TEXT,
@@ -53,20 +53,20 @@ CREATE TABLE rating_history (
 
 -- 4. Bookmarking
 CREATE TABLE bookmarking_person (
-    userid   INTEGER     NOT NULL REFERENCES app_user (userid),
+    userid   INTEGER     NOT NULL REFERENCES app_user (userid) ON DELETE CASCADE,
     nconst   VARCHAR(10) NOT NULL REFERENCES name_basics (nconst),
     PRIMARY KEY (userid, nconst)
 );
 
 CREATE TABLE bookmarking_title (
-    userid   INTEGER     NOT NULL REFERENCES app_user (userid),
+    userid   INTEGER     NOT NULL REFERENCES app_user (userid) ON DELETE CASCADE,
     tconst   VARCHAR(10) NOT NULL REFERENCES title_basic (tconst),
     PRIMARY KEY (userid, tconst)
 );
 
 -- 5. Genre preferences
 CREATE TABLE generes_user (
-    userid     INTEGER NOT NULL REFERENCES app_user (userid),
+    userid     INTEGER NOT NULL REFERENCES app_user (userid) ON DELETE CASCADE,
     genereid   INTEGER NOT NULL REFERENCES generes (genereid),
     PRIMARY KEY (userid, genereid)
 );
