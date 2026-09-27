@@ -15,7 +15,7 @@ DROP FUNCTION IF EXISTS words_query(TEXT[]);
 DROP FUNCTION IF EXISTS weights_search(TEXT[]);
 DROP TABLE IF EXISTS weights;
 
--- 1-D.1 Basic framework functionality
+-- D.1 Basic framework functionality
 --User management
 CREATE OR REPLACE FUNCTION create_user(
     p_username    TEXT,
@@ -125,23 +125,23 @@ END;
 $$ LANGUAGE plpgsql;
 
 
--- 1-D.2 Simple search
+-- D.2 Simple search
 
--- 1-D.3 Rating
+-- D.3 Rating
 
--- 1-D.4 Structured search
+-- D.4 Structured search
 
--- 1-D.5 Finding names
+-- D.5 Finding names
 
--- 1-D.6 Co-players
+-- D.6 Co-players
 
--- 1-D.7 Name rating (dynamic)
+-- D.7 Name rating (dynamic)
 
--- 1-D.8 Popular actors
+-- D.8 Popular actors
 
--- 1-D.9 Similar movies
+-- D.9 Similar movies
 
--- 1-D.10–14 IR functions 
+-- D.10–14 IR functions 
 CREATE OR REPLACE FUNCTION search_by_exact_name(p_name VARCHAR)
 RETURNS TABLE(a_word TEXT, number BIGINT) AS $$
 BEGIN
