@@ -8,6 +8,15 @@ DROP FUNCTION IF EXISTS get_bookmarked_titles(INTEGER);
 DROP FUNCTION IF EXISTS get_bookmarked_persons(INTEGER);
 DROP FUNCTION IF EXISTS get_search_history(INTEGER);
 DROP FUNCTION IF EXISTS get_rating_history(INTEGER);
+DROP TRIGGER IF EXISTS update_name_rating_trigger ON title_ratings;
+DROP FUNCTION IF EXISTS update_name_ratings_after_rate();
+DROP FUNCTION IF EXISTS string_search(INTEGER, TEXT);
+DROP FUNCTION IF EXISTS rate(INTEGER, CHARACTER(10), INTEGER);
+DROP FUNCTION IF EXISTS structured_string_search(INTEGER, TEXT, TEXT, TEXT, TEXT);
+DROP FUNCTION IF EXISTS search_names(INTEGER, TEXT);
+DROP FUNCTION IF EXISTS co_players(VARCHAR);
+DROP FUNCTION IF EXISTS popular_actors_in_movie(VARCHAR);
+DROP FUNCTION IF EXISTS similarity_search(VARCHAR, INTEGER);
 DROP FUNCTION IF EXISTS search_by_exact_name(VARCHAR);
 DROP FUNCTION IF EXISTS exact_match_search(TEXT[]);
 DROP FUNCTION IF EXISTS any_match_search(TEXT[]);
@@ -125,21 +134,173 @@ END;
 $$ LANGUAGE plpgsql;
 
 
--- D.2 Simple search
+--D2
 
--- D.3 Rating
+CREATE OR REPLACE FUNCTION string_search(p_userid INTEGER, p_query TEXT)
+RETURNS TABLE(id VARCHAR(10), title TEXT) AS $$
+BEGIN
+INSERT INTO history(userid, value) VALUES (p_userid, p_query);
+RETURN QUERY
+SELECT tconst, primarytitle
+FROM title_basic
+WHERE
+primarytitle LIKE '%' || p_query || '%'
+OR
+plot LIKE '%' || p_query || '%';
+END;
+$$ LANGUAGE plpgsql;
 
--- D.4 Structured search
 
--- D.5 Finding names
 
--- D.6 Co-players
+--D3
 
--- D.7 Name rating (dynamic)
+CREATE OR REPLACE FUNCTION rate(p_userid INTEGER, p_tconst CHARACTER(10), p_new_rating INTEGER)
+RETURNS void AS $$
+DECLARE
+	old_value SMALLINT;
+BEGIN
+	IF EXISTS (SELECT 1 FROM rating_history WHERE userid = p_userid AND tconst = p_tconst) 
+		THEN 
+		SELECT value INTO old_value FROM rating_history WHERE userid = p_userid AND tconst = p_tconst;
+		UPDATE title_ratings SET averagerating = (averagerating * numvotes - old_value + p_new_rating) / numvotes WHERE tconst = p_tconst;
+		UPDATE rating_history SET value = p_new_rating WHERE userid = p_userid AND tconst = p_tconst;
+	ELSE
+		UPDATE title_ratings 
+		SET averagerating = (averagerating * numvotes + p_new_rating) / (numvotes + 1), numvotes = numvotes + 1
+		WHERE tconst = p_tconst;
+		INSERT INTO rating_history(userid, tconst, value) VALUES (p_userid, p_tconst, p_new_rating);
+	END IF;
+END;
+$$ LANGUAGE plpgsql;
 
--- D.8 Popular actors
 
--- D.9 Similar movies
+--D4
+
+
+
+
+CREATE OR REPLACE FUNCTION structured_string_search(
+    p_userid INTEGER,
+    p_title TEXT,
+    p_plot TEXT,
+    p_characters TEXT,
+    p_names TEXT
+)
+RETURNS TABLE(id VARCHAR(10), title TEXT) AS $$
+BEGIN
+INSERT INTO history(userid, value) VALUES (p_userid, 'title:' || p_title || ' plot:' || p_plot || ' characters:' || p_characters || ' names:' || p_names);
+RETURN QUERY
+SELECT tb.tconst, tb.primarytitle
+FROM title_basic tb
+WHERE (p_title <> '' AND tb.primarytitle ILIKE '%' || p_title || '%')
+OR (p_plot <> '' AND tb.plot ILIKE '%' || p_plot || '%')
+OR (p_names <> '' AND EXISTS (SELECT 1 FROM title_principals tp
+    JOIN name_basics nb ON tp.nconst = nb.nconst
+    WHERE tp.tconst = tb.tconst AND nb.primaryname ILIKE '%' || p_names || '%'
+))
+OR (p_characters <> '' AND EXISTS (SELECT 1 FROM title_principals tp
+    JOIN title_character nb ON tp.principalid = nb.principalid
+    WHERE tp.tconst = tb.tconst AND nb.character ILIKE '%' || p_characters || '%'
+));
+
+END;
+$$ LANGUAGE plpgsql;
+
+--D5
+
+CREATE OR REPLACE FUNCTION search_names(p_userid INTEGER, p_name TEXT)
+RETURNS TABLE(nconst VARCHAR(10), name TEXT) AS $$
+BEGIN
+INSERT INTO history(userid, value) VALUES (p_userid, p_name);
+RETURN QUERY
+SELECT name_basics.nconst, primaryname FROM name_basics WHERE primaryname ILIKE '%' || p_name || '%';
+
+END;
+$$ LANGUAGE plpgsql;
+
+
+--D6
+CREATE OR REPLACE FUNCTION co_players(p_name VARCHAR)
+RETURNS TABLE(nconst VARCHAR(10), name TEXT, freq BIGINT) AS $$
+BEGIN
+    RETURN QUERY
+	SELECT n2.nconst, n2.primaryname, COUNT(*) AS freq
+	FROM title_principals tp1
+	JOIN title_principals tp2 ON tp1.tconst = tp2.tconst AND tp1.nconst <> tp2.nconst
+	JOIN name_basics n1 ON tp1.nconst = n1.nconst
+	JOIN name_basics n2 ON tp2.nconst = n2.nconst
+	WHERE n1.primaryname = p_name
+	GROUP BY n2.nconst, n2.primaryname
+	ORDER BY freq DESC;
+END;
+$$ LANGUAGE plpgsql;
+
+--D7
+
+CREATE OR REPLACE FUNCTION update_name_ratings_after_rate()
+RETURNS TRIGGER AS $$
+BEGIN
+	UPDATE name_ratings nr
+SET averagerating = (
+    SELECT ROUND(SUM(tr.averagerating * tr.numvotes) / NULLIF(SUM(tr.numvotes), 0), 1)
+    FROM title_principals tp
+    JOIN title_ratings tr ON tr.tconst = tp.tconst
+    WHERE tp.nconst = nr.nconst
+),
+agg_numvotes = (
+    SELECT SUM(tr.numvotes)
+    FROM title_principals tp
+    JOIN title_ratings tr ON tr.tconst = tp.tconst
+    WHERE tp.nconst = nr.nconst
+)
+WHERE nr.nconst IN (
+    SELECT nconst FROM title_principals WHERE tconst = NEW.tconst
+);
+
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+
+CREATE TRIGGER update_name_rating_trigger
+AFTER UPDATE ON title_ratings
+FOR EACH ROW
+EXECUTE FUNCTION update_name_ratings_after_rate();
+
+--D8
+
+CREATE OR REPLACE FUNCTION popular_actors_in_movie(p_tconst VARCHAR)
+RETURNS TABLE(nconst VARCHAR(10), name TEXT, rating NUMERIC) AS $$
+BEGIN
+    RETURN QUERY
+	SELECT name_basics.nconst, primaryname, averagerating 
+	FROM title_principals 
+	JOIN name_ratings ON title_principals.nconst = name_ratings.nconst 
+	JOIN name_basics ON name_ratings.nconst = name_basics.nconst 
+	WHERE title_principals.tconst = p_tconst 
+	ORDER by averagerating DESC;
+END;
+$$ LANGUAGE plpgsql;
+
+
+--D9
+
+CREATE OR REPLACE FUNCTION similarity_search(p_tconst VARCHAR, p_limit INTEGER)
+RETURNS TABLE(primarytitle TEXT, tconst VARCHAR(10), freq BIGINT) AS $$
+BEGIN
+    RETURN QUERY
+	SELECT tb.primarytitle, tp2.tconst, COUNT(*) AS freq
+	FROM generes_title_basic tp1
+	JOIN generes_title_basic tp2
+	ON tp1.genereid = tp2.genereid AND tp1.tconst <> tp2.tconst
+	JOIN title_basic tb 
+	ON tp2.tconst = tb.tconst
+	WHERE tp1.tconst = p_tconst
+	GROUP BY tp2.tconst, tb.primarytitle
+	ORDER BY freq DESC
+	LIMIT p_limit;
+END;
+$$ LANGUAGE plpgsql;
 
 -- D.10–14 IR functions 
 CREATE OR REPLACE FUNCTION search_by_exact_name(p_name VARCHAR)
