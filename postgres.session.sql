@@ -1,9 +1,11 @@
-
-DROP TABLE IF EXISTS raw_title_basics CASCADE;
-DROP TABLE IF EXISTS raw_title_akas CASCADE;
-DROP TABLE IF EXISTS raw_title_principals CASCADE;
-DROP TABLE IF EXISTS raw_title_ratings CASCADE;
-DROP TABLE IF EXISTS raw_title_episode CASCADE;
-DROP TABLE IF EXISTS raw_title_crew CASCADE;
-DROP TABLE IF EXISTS raw_name_basics CASCADE;
-DROP TABLE IF EXISTS omdb_data CASCADE;
+CREATE OR REPLACE FUNCTION delete_user(p_userid INTEGER)
+RETURNS VOID AS $$
+BEGIN
+    DELETE FROM bookmarking_title WHERE userid = p_userid;
+    DELETE FROM bookmarking_person WHERE userid = p_userid;
+    DELETE FROM rating_history WHERE userid = p_userid;
+    DELETE FROM history WHERE userid = p_userid;
+    DELETE FROM generes_user WHERE userid = p_userid;
+    DELETE FROM app_user WHERE userid = p_userid;
+END;
+$$ LANGUAGE plpgsql;
