@@ -24,6 +24,16 @@ DROP FUNCTION IF EXISTS words_query(TEXT[]);
 DROP FUNCTION IF EXISTS weights_search(TEXT[]);
 DROP TABLE IF EXISTS weights;
 
+
+DO $$
+BEGIN
+    IF (SELECT data_type FROM information_schema.columns
+        WHERE table_schema = 'public' AND table_name = 'wi' AND column_name = 'tconst') = 'character' THEN
+        ALTER TABLE wi ALTER COLUMN tconst TYPE VARCHAR(10) USING trim(tconst);
+    END IF;
+END $$;
+
+
 -- D.1 Basic framework functionality
 --User management
 CREATE OR REPLACE FUNCTION create_user(
@@ -178,7 +188,6 @@ $$ LANGUAGE plpgsql;
 
 
 
-
 CREATE OR REPLACE FUNCTION structured_string_search(
     p_userid INTEGER,
     p_title TEXT,
@@ -188,21 +197,31 @@ CREATE OR REPLACE FUNCTION structured_string_search(
 )
 RETURNS TABLE(id VARCHAR(10), title TEXT) AS $$
 BEGIN
-INSERT INTO history(userid, value) VALUES (p_userid, 'title:' || p_title || ' plot:' || p_plot || ' characters:' || p_characters || ' names:' || p_names);
-RETURN QUERY
-SELECT tb.tconst, tb.primarytitle
-FROM title_basic tb
-WHERE (p_title <> '' AND tb.primarytitle ILIKE '%' || p_title || '%')
-OR (p_plot <> '' AND tb.plot ILIKE '%' || p_plot || '%')
-OR (p_names <> '' AND EXISTS (SELECT 1 FROM title_principals tp
-    JOIN name_basics nb ON tp.nconst = nb.nconst
-    WHERE tp.tconst = tb.tconst AND nb.primaryname ILIKE '%' || p_names || '%'
-))
-OR (p_characters <> '' AND EXISTS (SELECT 1 FROM title_principals tp
-    JOIN title_character nb ON tp.principalid = nb.principalid
-    WHERE tp.tconst = tb.tconst AND nb.character ILIKE '%' || p_characters || '%'
-));
+    IF p_title = '' AND p_plot = '' AND p_characters = '' AND p_names = '' THEN
+        RETURN;
+    END IF;
 
+    INSERT INTO history(userid, value)
+    VALUES (p_userid, 'title:' || p_title || ' plot:' || p_plot
+                      || ' characters:' || p_characters || ' names:' || p_names);
+
+    RETURN QUERY
+    SELECT tb.tconst, tb.primarytitle
+    FROM title_basic tb
+    WHERE (p_title = '' OR tb.primarytitle ILIKE '%' || p_title || '%')
+      AND (p_plot = ''  OR tb.plot ILIKE '%' || p_plot || '%')
+      AND (p_names = '' OR EXISTS (
+            SELECT 1
+            FROM title_principals tp
+            JOIN name_basics nb ON nb.nconst = tp.nconst
+            WHERE tp.tconst = tb.tconst
+              AND nb.primaryname ILIKE '%' || p_names || '%'))
+      AND (p_characters = '' OR EXISTS (
+            SELECT 1
+            FROM title_principals tp
+            JOIN title_character tc ON tc.principalid = tp.principalid
+            WHERE tp.tconst = tb.tconst
+              AND tc.character ILIKE '%' || p_characters || '%'));
 END;
 $$ LANGUAGE plpgsql;
 
@@ -224,7 +243,7 @@ CREATE OR REPLACE FUNCTION co_players(p_name VARCHAR)
 RETURNS TABLE(nconst VARCHAR(10), name TEXT, freq BIGINT) AS $$
 BEGIN
     RETURN QUERY
-	SELECT n2.nconst, n2.primaryname, COUNT(*) AS freq
+	SELECT n2.nconst, n2.primaryname, COUNT(DISTINCT tp1.tconst) AS freq
 	FROM title_principals tp1
 	JOIN title_principals tp2 ON tp1.tconst = tp2.tconst AND tp1.nconst <> tp2.nconst
 	JOIN name_basics n1 ON tp1.nconst = n1.nconst
@@ -270,18 +289,19 @@ EXECUTE FUNCTION update_name_ratings_after_rate();
 --D8
 
 CREATE OR REPLACE FUNCTION popular_actors_in_movie(p_tconst VARCHAR)
-RETURNS TABLE(nconst VARCHAR(10), name TEXT, rating NUMERIC) AS $$
+RETURNS TABLE(nconst VARCHAR(10), name TEXT, rating NUMERIC, votes INTEGER) AS $$
 BEGIN
     RETURN QUERY
-	SELECT name_basics.nconst, primaryname, averagerating 
-	FROM title_principals 
-	JOIN name_ratings ON title_principals.nconst = name_ratings.nconst 
-	JOIN name_basics ON name_ratings.nconst = name_basics.nconst 
-	WHERE title_principals.tconst = p_tconst 
-	ORDER by averagerating DESC;
+    SELECT nb.nconst, nb.primaryname, nr.averagerating, nr.agg_numvotes
+    FROM (SELECT DISTINCT tp.nconst
+          FROM title_principals tp
+          JOIN category c ON c.categoryid = tp.categoryid
+          WHERE tp.tconst = p_tconst AND c.name IN ('actor', 'actress')) a
+    JOIN name_ratings nr ON nr.nconst = a.nconst
+    JOIN name_basics nb  ON nb.nconst = a.nconst
+    ORDER BY nr.averagerating DESC, nr.agg_numvotes DESC, nb.primaryname;
 END;
 $$ LANGUAGE plpgsql;
-
 
 --D9
 
@@ -318,7 +338,7 @@ END;
 $$ LANGUAGE plpgsql;
 
 CREATE OR REPLACE FUNCTION exact_match_search(p_words TEXT[])
-RETURNS TABLE(tconst CHARACTER(10)) AS $$
+RETURNS TABLE(tconst VARCHAR(10)) AS $$
 BEGIN
   RETURN QUERY
     SELECT wi.tconst
@@ -330,7 +350,7 @@ END;
 $$ LANGUAGE plpgsql;
 
 CREATE OR REPLACE FUNCTION any_match_search(p_words TEXT[])
-RETURNS TABLE(tconst CHARACTER(10), rank BIGINT) AS $$
+RETURNS TABLE(tconst VARCHAR(10), rank BIGINT) AS $$
 BEGIN
   RETURN QUERY
     SELECT wi.tconst, COUNT(DISTINCT wi.word) AS rank
@@ -368,7 +388,7 @@ create table weights as
     ON tf.word = df.word;
 
 CREATE OR REPLACE FUNCTION weights_search(p_words TEXT[])
-RETURNS TABLE(tconst CHARACTER(10), rank NUMERIC) AS $$
+RETURNS TABLE(tconst VARCHAR(10), rank NUMERIC) AS $$
 BEGIN
   RETURN QUERY
     SELECT weights.tconst, SUM(weights.weight)::NUMERIC AS rank
