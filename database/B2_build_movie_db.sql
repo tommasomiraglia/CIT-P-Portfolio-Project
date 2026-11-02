@@ -1,3 +1,14 @@
+--=======UPDTE====== 
+--rate() and the name + rating trigger
+--rate() took the title id as char(10), ignored titles without a row in
+--title_ratings and did not check the range. It now takes varchar(10), rejects values outside 1-10, and creates
+--the title_ratings row for a title first vote. The trigger applies after
+--INSERT as well as UPDATE, creates missing name_ratings rows, and counts each
+--title once per person.
+--B2 computes name_ratings with the same formula.
+
+
+
 --Data Cleaning
 
 -- removing dead dependencies
@@ -423,7 +434,7 @@ SELECT
     tp.nconst,
     ROUND(SUM(tr.averagerating * tr.numvotes) / NULLIF(SUM(tr.numvotes), 0), 1) AS averagerating,
     SUM(tr.numvotes) AS agg_numvotes
-FROM title_principals tp
+FROM (SELECT DISTINCT tconst, nconst FROM title_principals) tp
 JOIN title_ratings tr ON tr.tconst = tp.tconst
 GROUP BY tp.nconst;
 

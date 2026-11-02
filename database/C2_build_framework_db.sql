@@ -19,27 +19,28 @@ CREATE TABLE app_user (
 );
 
 -- 2. Search history
+
+-- "historyid is a surrogate key. 
+-- "now() used to return the same value for every statemant in one transaction
+-- so "(userid, time) was not unique"
+
 CREATE TABLE history (
+    historyid BIGSERIAL PRIMARY KEY,
     userid   INTEGER   NOT NULL REFERENCES app_user (userid) ON DELETE CASCADE,
-    time     TIMESTAMP NOT NULL DEFAULT now(),
-    value    TEXT,
-    PRIMARY KEY (userid, time)
+    time     TIMESTAMP NOT NULL DEFAULT clock_timestamp(),
+    value    TEXT NOT NULL
 );
 
 CREATE TABLE history_name_basic (
-    userid   INTEGER   NOT NULL,
-    time     TIMESTAMP NOT NULL,
+    historyid   BIGINT   NOT NULL REFERENCES history (historyid) ON DELETE CASCADE,
     nconst   VARCHAR(10) NOT NULL REFERENCES name_basics (nconst),
-    PRIMARY KEY (userid, time, nconst),
-    FOREIGN KEY (userid, time) REFERENCES history (userid, time) ON DELETE CASCADE
+    PRIMARY KEY (historyid, nconst)
 );
 
 CREATE TABLE history_title_basic (
-    userid   INTEGER   NOT NULL,
-    time     TIMESTAMP NOT NULL,
+    historyid   BIGINT   NOT NULL REFERENCES history (historyid) ON DELETE CASCADE,
     tconst   VARCHAR(10) NOT NULL REFERENCES title_basic (tconst),
-    PRIMARY KEY (userid, time, tconst),
-    FOREIGN KEY (userid, time) REFERENCES history (userid, time) ON DELETE CASCADE
+    PRIMARY KEY (historyid, tconst)
 );
 
 -- 3. Rating history
