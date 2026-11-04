@@ -1,0 +1,20 @@
+# Editor settings shared by the whole group. See https://editorconfig.org
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+indent_style = space
+indent_size = 2
+insert_final_newline = true
+trim_trailing_whitespace = true
+
+[*.md]
+# Two trailing spaces are a line break in Markdown.
+trim_trailing_whitespace = false
+
+[*.sql]
+# Matches the existing Subproject 1 scripts. No trimming, so editing
+# one line does not turn into a whitespace change across the whole file.
+indent_size = 4
+trim_trailing_whitespace = false

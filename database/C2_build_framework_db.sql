@@ -20,9 +20,9 @@ CREATE TABLE app_user (
 
 -- 2. Search history
 
--- "historyid is a surrogate key. 
--- "now() used to return the same value for every statemant in one transaction
--- so "(userid, time) was not unique"
+-- historyid is a surrogate key.
+-- The old key (userid, time) was not unique: now() returns the same value
+-- for every statement in one transaction. clock_timestamp() returns the real current time.
 
 CREATE TABLE history (
     historyid BIGSERIAL PRIMARY KEY,

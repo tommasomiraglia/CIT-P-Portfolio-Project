@@ -1,0 +1,10 @@
+{
+  // Type-checks the tests together with the code they import. Emits nothing:
+  // tsx runs the tests directly, and the tests must not end up in dist/.
+  "extends": "../tsconfig.json",
+  "compilerOptions": {
+    "rootDir": "..",
+    "noEmit": true
+  },
+  "include": ["../src", "."]
+}

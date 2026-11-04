@@ -1,41 +1,129 @@
 # CIT/P Portfolio Project
 
-Movie Data Model and Framework Model in PostgreSQL.
-The database is also available on cit.ruc.dk in the database `cit16`.
+A movie application on IMDB data: a PostgreSQL database (`database/`), a REST API (`backend/`), and later a React frontend.
+The assignment is in `docs/project-description.pdf`.
 
 ## Requirements
 
-The build starts from a database that already contains the content of
-`imdb.backup`, `omdb_data.backup` and `wi.backup` (these files are not included).
+- PostgreSQL with `psql`
+- Node.js 24 or later
+- `imdb.backup`, `omdb_data.backup` and `wi.backup` in `database/` (not in git: too large)
 
-## Build order
+## 1. Build the database
 
-The order matters, because each script uses tables from the previous one:
-
-1. `B2_build_movie_db.sql` (renames the raw tables, builds the new schema, drops the raw tables)
-2. `C2_build_framework_db.sql` (refers to tables created by B2)
-3. `D1_functionality.sql` (uses the table `wi` from `wi.backup`)
-4. `D2_indexes.sql`
-5. `test_script.sql`
-
-## Commands
+Create an empty database, then run from the repository root, in this order:
 
 ```powershell
-psql -h localhost -U userName -d databaseName -f .\database\imdb.backup
-psql -h localhost -U userName -d databaseName -f .\database\omdb_data.backup
-psql -h localhost -U userName -d databaseName -f .\database\wi.backup
-psql -h localhost -U userName -d databaseName -f .\database\B2_build_movie_db.sql
-psql -h localhost -U userName -d databaseName -f .\database\C2_build_framework_db.sql
-psql -h localhost -U userName -d databaseName -f .\database\D1_functionality.sql
-psql -h localhost -U userName -d databaseName -f .\database\D2_indexes.sql
-psql -h localhost -U userName -d databaseName -f test.sql > test_output.txt
+psql -h localhost -U postgres -d imdb -f .\database\imdb.backup
+psql -h localhost -U postgres -d imdb -f .\database\omdb_data.backup
+psql -h localhost -U postgres -d imdb -f .\database\wi.backup
+psql -h localhost -U postgres -d imdb -f .\database\B2_build_movie_db.sql
+psql -h localhost -U postgres -d imdb -f .\database\C2_build_framework_db.sql
+psql -h localhost -U postgres -d imdb -f .\database\D1_functionality.sql
+psql -h localhost -U postgres -d imdb -f .\database\D2_indexes.sql
 ```
 
-## Notes
+B2 drops the raw tables, so it only works on a freshly loaded database.
 
-- B2 must be run on a freshly loaded database. It renames the source tables
-  and drops them at the end, so it cannot be run twice on the same database.
-- The test script calls the functions of D1 and therefore writes some rows
-  (users, history, ratings, bookmarks) to the database.
-- `D1_functionality.sql` creates the table `weights` from `wi`, which can take
-  some time.
+`database/F1_test.sql` tests the functions.
+It runs in one transaction that it rolls back, so it leaves no rows behind, and it stops with `FAIL: ...` when a check fails.
+To regenerate its output, use `cmd /c` so the file stays UTF-8 (PowerShell's `>` writes UTF-16):
+
+```powershell
+cmd /c "psql -h localhost -U postgres -d imdb -a -f database\F1_test.sql > database\F1_test_output.txt 2>&1"
+```
+
+## 2. Set up the backend
+
+```powershell
+cd backend
+npm install
+copy .env.example .env    # then put your database password in .env
+```
+
+`PORT` in `.env` sets the port of the API. It is optional and defaults to 3000.
+
+## 3. Check that everything works
+
+```powershell
+cd backend
+npm run db:check
+```
+
+It only reads from the database.
+Expected output:
+
+```text
+Connected to database "imdb" as user "postgres"
+  OK      table title_basic
+  OK      table app_user
+  OK      function string_search
+Database check passed.
+```
+
+| If you see | Fix |
+| --- | --- |
+| `Missing required environment variable(s): ...` | Fill in those values in `backend/.env` |
+| `password authentication failed` | Wrong `DB_PASSWORD` in `backend/.env` |
+| `ECONNREFUSED` | PostgreSQL is not running, or `DB_HOST`/`DB_PORT` is wrong |
+| `database "..." does not exist` | Wrong `DB_NAME`, or step 1 was not done |
+| `MISSING table ...` / `MISSING function ...` | A script from step 1 was not run |
+
+## 4. Run the API
+
+All commands run from `backend/`.
+
+| Command | What it does |
+| --- | --- |
+| `npm run dev` | Starts the API in watch mode: it restarts on every change in `src/`. Use this while developing. |
+| `npm run build` | Compiles TypeScript from `src/` into `dist/`. Must pass before pushing. |
+| `npm start` | Runs the compiled API from `dist/`. Run `npm run build` first. |
+| `npm test` | Type-checks `src/` and `test/`, then runs the tests in `test/` with Vitest. |
+| `npm run lint` | Checks formatting, import order and lint rules with Biome. Must pass before pushing. |
+| `npm run lint:fix` | Fixes what Biome can fix by itself. |
+| `npm run db:check` | Checks the database connection (see step 3). |
+
+Stop the server with Ctrl+C.
+It finishes the requests in progress and closes the database connections before exiting.
+
+The tests use the database configured in `backend/.env`, so step 1 must be done and PostgreSQL must be running.
+They only read from it.
+
+## Endpoints
+
+| Method and path | Response |
+| --- | --- |
+| `GET /api/health` | `200 {"status":"ok"}`, or `503` if the database does not answer |
+| `GET /api/titles/:id` | `200` with the title, `400` if `:id` is not a title id like `tt0052520`, `404` if no title has that id |
+
+Example:
+
+```powershell
+curl.exe http://localhost:3000/api/titles/tt0052520    # plain "curl" is a different command in PowerShell
+```
+
+```json
+{
+  "url": "/api/titles/tt0052520",
+  "id": "tt0052520",
+  "title": "The Twilight Zone",
+  "type": "tvSeries",
+  "isAdult": false,
+  "startYear": 1959,
+  "endYear": 1964,
+  "runtimeMinutes": 50,
+  "plot": "The Twilight Zone is a place that exists ...",
+  "posterUrl": "https://m.media-amazon.com/images/M/..."
+}
+```
+
+Missing values are always `null`.
+
+Every error has the same shape, with the matching HTTP status:
+
+```json
+{ "error": { "message": "Title tt9999999 not found" } }
+```
+
+Unexpected errors return `500` with a generic message.
+The details are only written to the server log.

@@ -1,1 +1,8 @@
 *.backup
+
+# Node.js backend
+node_modules/
+dist/
+
+# Local secrets: never commit
+.env

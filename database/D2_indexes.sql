@@ -19,7 +19,7 @@ CREATE index Idx_history_user_time ON history (userid, time DESC);
 
 -- IR functions 1.D.11-1.D.14 find the rows for the given words
 CREATE INDEX idx_wi_word_tconst ON wi (word, tconst);
--- person_words, words_query all words of a given set of titles
+-- person_words and words_query read all words of a given set of titles
 CREATE INDEX idx_wi_tconst ON wi (tconst);
--- weights_search weight and title read straight from the index
+-- weights_search reads the weight and title straight from the index
 CREATE INDEX idx_weights_word ON weights (word) INCLUDE (tconst, weight);

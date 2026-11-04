@@ -1,0 +1,441 @@
+-- F1: tests of the functions in D1_functionality.sql.
+-- Run it after B2, C2, D1 and D2 (see README.md).
+-- Everything runs in one transaction that is rolled back at the end, so the script leaves no rows behind.
+-- The comment after each call says what the result should be.
+-- The DO blocks check a result themselves and stop the script with "FAIL: ..." when it is wrong.
+\set ON_ERROR_STOP on
+\pset footer off
+BEGIN;
+BEGIN
+------------------------------------------------------------------
+-- D1: users
+------------------------------------------------------------------
+SELECT create_user('f1_test_user', 'f1_test@example.com', 'secret') AS userid \gset
+SELECT * FROM get_user(:userid);                                   -- one row, no password column
+ userid |   username   |        email        | phonenumber | langid | regionid 
+--------+--------------+---------------------+-------------+--------+----------
+      2 | f1_test_user | f1_test@example.com |             |        |         
+
+SELECT update_user(:userid, p_phonenumber => '12345678') AS updated;  -- t
+ updated 
+---------
+ t
+
+SELECT * FROM get_user(:userid);                                   -- phonenumber 12345678, the rest unchanged
+ userid |   username   |        email        | phonenumber | langid | regionid 
+--------+--------------+---------------------+-------------+--------+----------
+      2 | f1_test_user | f1_test@example.com | 12345678    |        |         
+
+SELECT update_user(-1, 'nobody') AS updated_missing_user;          -- f
+ updated_missing_user 
+----------------------
+ f
+
+------------------------------------------------------------------
+-- D1: bookmarks
+------------------------------------------------------------------
+SELECT bookmark_title(:userid, 'tt0468569') AS created;            -- t
+ created 
+---------
+ t
+
+SELECT bookmark_title(:userid, 'tt0468569') AS created_again;      -- f (already there)
+ created_again 
+---------------
+ f
+
+SELECT bookmark_title(:userid, 'tt1375666') AS created;            -- t
+ created 
+---------
+ t
+
+SELECT * FROM get_bookmarked_titles(:userid, 10, 0);               -- Inception, The Dark Knight
+  tconst   |  primarytitle   
+-----------+-----------------
+ tt1375666 | Inception
+ tt0468569 | The Dark Knight
+
+SELECT * FROM get_bookmarked_titles(:userid, 1, 1);                -- The Dark Knight only (second page of size 1)
+  tconst   |  primarytitle   
+-----------+-----------------
+ tt0468569 | The Dark Knight
+
+SELECT remove_bookmark_title(:userid, 'tt0468569') AS deleted;     -- t
+ deleted 
+---------
+ t
+
+SELECT remove_bookmark_title(:userid, 'tt0468569') AS deleted_again; -- f (not found)
+ deleted_again 
+---------------
+ f
+
+SELECT bookmark_person(:userid, 'nm0586568') AS created;           -- t
+ created 
+---------
+ t
+
+SELECT bookmark_person(:userid, 'nm0586568') AS created_again;     -- f
+ created_again 
+---------------
+ f
+
+SELECT * FROM get_bookmarked_persons(:userid, 10, 0);              -- Mads Mikkelsen
+  nconst   |  primaryname   
+-----------+----------------
+ nm0586568 | Mads Mikkelsen
+
+SELECT remove_bookmark_person(:userid, 'nm0586568') AS deleted;    -- t
+ deleted 
+---------
+ t
+
+------------------------------------------------------------------
+-- D1: genre preferences
+------------------------------------------------------------------
+SELECT add_genre_preference(:userid, 3) AS created;                -- t
+ created 
+---------
+ t
+
+SELECT add_genre_preference(:userid, 3) AS created_again;          -- f
+ created_again 
+---------------
+ f
+
+SELECT * FROM get_genre_preferences(:userid, 10, 0);               -- Horror
+ genereid |  name  
+----------+--------
+        3 | Horror
+
+SELECT remove_genre_preference(:userid, 3) AS deleted;             -- t
+ deleted 
+---------
+ t
+
+------------------------------------------------------------------
+-- D1: search history
+------------------------------------------------------------------
+SELECT add_search_history(:userid, 'Dark Knight') AS historyid \gset
+SELECT add_search_history(:userid, 'Mikkelsen') AS second_historyid;
+ second_historyid 
+------------------
+                4
+
+SELECT * FROM get_search_history(:userid, 10, 0);                  -- Mikkelsen first, then Dark Knight
+ historyid |            time            |    value    
+-----------+----------------------------+-------------
+         4 | 2026-11-04 17:18:45.209115 | Mikkelsen
+         3 | 2026-11-04 17:18:45.208586 | Dark Knight
+
+SELECT delete_search_history_entry(:userid, :historyid) AS deleted;       -- t
+ deleted 
+---------
+ t
+
+SELECT delete_search_history_entry(:userid, :historyid) AS deleted_again; -- f
+ deleted_again 
+---------------
+ f
+
+SELECT clear_search_history(:userid) AS removed_entries;           -- 1
+ removed_entries 
+-----------------
+               1
+
+------------------------------------------------------------------
+-- D2, D4, D5: searches (they no longer write to history)
+------------------------------------------------------------------
+SELECT * FROM string_search('Dark Knight', 5, 0);                  -- titles containing "Dark Knight"
+   tconst   |              primarytitle               
+------------+-----------------------------------------
+ tt2347162  | Bat Romance
+ tt2166834  | Batman: The Dark Knight Returns, Part 2
+ tt38960036 | Dark Knight of the Soul
+ tt5239504  | Ending the Knight
+ tt0464032  | Guns, Drugs and Dirty Money
+
+SELECT * FROM structured_string_search('Dark Knight', '', '', 'Ledger', 5, 0);  -- title AND name must match
+  tconst   |  primarytitle   
+-----------+-----------------
+ tt0468569 | The Dark Knight
+
+SELECT count(*) AS all_fields_empty
+FROM structured_string_search('', '', '', '', 5, 0);               -- 0
+ all_fields_empty 
+------------------
+                0
+
+SELECT * FROM search_names('Mads Mikkelsen', 5, 0);                -- Mads Mikkelsen
+  nconst   |  primaryname   
+-----------+----------------
+ nm0586568 | Mads Mikkelsen
+
+DO $$
+BEGIN
+    IF EXISTS (SELECT 1 FROM history
+               WHERE userid = (SELECT userid FROM app_user WHERE username = 'f1_test_user')) THEN
+        RAISE EXCEPTION 'FAIL: a search function wrote to history';
+    END IF;
+    RAISE NOTICE 'OK: searches did not write to history';
+END $$;
+psql:database/F1_test.sql:77: NOTICE:  OK: searches did not write to history
+DO
+------------------------------------------------------------------
+-- D3: rating
+------------------------------------------------------------------
+SELECT averagerating, numvotes FROM title_ratings WHERE tconst = 'tt1375666';  -- before
+ averagerating | numvotes 
+---------------+----------
+           8.8 |  2854480
+
+SELECT rate(:userid, 'tt1375666', 10);
+ rate 
+------
+ 
+
+SELECT averagerating, numvotes FROM title_ratings WHERE tconst = 'tt1375666';  -- numvotes + 1
+ averagerating | numvotes 
+---------------+----------
+           8.8 |  2854481
+
+SELECT rate(:userid, 'tt1375666', 2);
+ rate 
+------
+ 
+
+SELECT averagerating, numvotes FROM title_ratings WHERE tconst = 'tt1375666';  -- same numvotes, new value counted
+ averagerating | numvotes 
+---------------+----------
+           8.8 |  2854481
+
+SELECT set_rating_comment(:userid, 'tt1375666', 'Changed my mind') AS updated;  -- t
+ updated 
+---------
+ t
+
+SELECT * FROM get_rating_history(:userid, 10, 0);                  -- Inception, 2, 'Changed my mind'
+  tconst   | primarytitle | value |     comment     
+-----------+--------------+-------+-----------------
+ tt1375666 | Inception    |     2 | Changed my mind
+
+DO $$
+BEGIN
+    PERFORM rate((SELECT userid FROM app_user WHERE username = 'f1_test_user'), 'tt1375666', 11);
+    RAISE EXCEPTION 'FAIL: rate accepted 11';
+EXCEPTION WHEN OTHERS THEN
+    IF SQLERRM LIKE 'FAIL%' THEN
+        RAISE;
+    END IF;
+    RAISE NOTICE 'OK: rate rejected 11 (%)', SQLERRM;
+END $$;
+psql:database/F1_test.sql:100: NOTICE:  OK: rate rejected 11 (Rating must be 1-10, got 11)
+DO
+SELECT unrate(:userid, 'tt1375666') AS deleted;                    -- t
+ deleted 
+---------
+ t
+
+SELECT unrate(:userid, 'tt1375666') AS deleted_again;              -- f
+ deleted_again 
+---------------
+ f
+
+SELECT averagerating, numvotes FROM title_ratings WHERE tconst = 'tt1375666';  -- back to the first values
+ averagerating | numvotes 
+---------------+----------
+           8.8 |  2854480
+
+------------------------------------------------------------------
+-- D3 + D7: first vote on an unrated title, then removing it again.
+-- tt0236605 (Planet Earth: Episode 10) has no row in title_ratings.
+-- After each step, every person in it must have the name rating that
+-- the B2 formula gives (each title counted once per person).
+------------------------------------------------------------------
+CREATE TEMP VIEW name_rating_check AS
+SELECT p.nconst,
+       nr.averagerating,
+       nr.agg_numvotes,
+       e.averagerating AS expected_rating,
+       e.agg_numvotes  AS expected_votes,
+       nr.averagerating IS NOT DISTINCT FROM e.averagerating
+         AND nr.agg_numvotes IS NOT DISTINCT FROM e.agg_numvotes AS ok
+FROM (SELECT DISTINCT nconst FROM title_principals WHERE tconst = 'tt0236605') AS p
+LEFT JOIN name_ratings nr ON nr.nconst = p.nconst
+LEFT JOIN (SELECT d.nconst,
+                  ROUND(SUM(tr.averagerating * tr.numvotes) / NULLIF(SUM(tr.numvotes), 0), 1) AS averagerating,
+                  SUM(tr.numvotes) AS agg_numvotes
+           FROM (SELECT DISTINCT tconst, nconst FROM title_principals) AS d
+           JOIN title_ratings tr ON tr.tconst = d.tconst
+           GROUP BY d.nconst) AS e ON e.nconst = p.nconst;
+CREATE VIEW
+SELECT rate(:userid, 'tt0236605', 7);
+ rate 
+------
+ 
+
+SELECT averagerating, numvotes FROM title_ratings WHERE tconst = 'tt0236605';  -- 7.0, 1
+ averagerating | numvotes 
+---------------+----------
+           7.0 |        1
+
+SELECT * FROM name_rating_check;                                   -- ok = t on every row
+  nconst   | averagerating | agg_numvotes | expected_rating | expected_votes | ok 
+-----------+---------------+--------------+-----------------+----------------+----
+ nm0596269 |           7.8 |           67 |             7.8 |             67 | t
+ nm0847002 |           8.0 |           13 |             8.0 |             13 | t
+ nm0032598 |           8.0 |           19 |             8.0 |             19 | t
+ nm0823579 |           8.1 |           67 |             8.1 |             67 | t
+ nm0221285 |           8.0 |           13 |             8.0 |             13 | t
+ nm0133854 |           8.0 |           13 |             8.0 |             13 | t
+
+DO $$
+BEGIN
+    IF EXISTS (SELECT 1 FROM name_rating_check WHERE NOT ok) THEN
+        RAISE EXCEPTION 'FAIL: name_ratings wrong after the first vote on a title';
+    END IF;
+    RAISE NOTICE 'OK: name_ratings updated after the first vote';
+END $$;
+psql:database/F1_test.sql:140: NOTICE:  OK: name_ratings updated after the first vote
+DO
+SELECT unrate(:userid, 'tt0236605') AS deleted;                    -- t
+ deleted 
+---------
+ t
+
+SELECT count(*) AS title_rating_rows FROM title_ratings WHERE tconst = 'tt0236605';  -- 0
+ title_rating_rows 
+-------------------
+                 0
+
+SELECT * FROM name_rating_check;                                   -- ok = t on every row
+  nconst   | averagerating | agg_numvotes | expected_rating | expected_votes | ok 
+-----------+---------------+--------------+-----------------+----------------+----
+ nm0596269 |           7.8 |           66 |             7.8 |             66 | t
+ nm0847002 |           8.1 |           12 |             8.1 |             12 | t
+ nm0032598 |           8.1 |           18 |             8.1 |             18 | t
+ nm0823579 |           8.1 |           66 |             8.1 |             66 | t
+ nm0221285 |           8.1 |           12 |             8.1 |             12 | t
+ nm0133854 |           8.1 |           12 |             8.1 |             12 | t
+
+DO $$
+BEGIN
+    IF EXISTS (SELECT 1 FROM name_rating_check WHERE NOT ok) THEN
+        RAISE EXCEPTION 'FAIL: name_ratings still count a title whose last vote was removed';
+    END IF;
+    RAISE NOTICE 'OK: name_ratings updated after the last vote was removed';
+END $$;
+psql:database/F1_test.sql:152: NOTICE:  OK: name_ratings updated after the last vote was removed
+DO
+------------------------------------------------------------------
+-- D6, D8, D9
+------------------------------------------------------------------
+SELECT * FROM co_players('nm0586568', 5, 0);                       -- actors who played most often with Mads Mikkelsen
+  nconst   |  primaryname  | freq 
+-----------+---------------+------
+ nm1046521 | Lars Ranthe   |    3
+ nm1105116 | Darren Jacobs |    2
+ nm1386659 | Emily O'Brien |    2
+ nm0181425 | Jesse Corti   |    2
+ nm2244205 | Léa Seydoux   |    2
+
+SELECT * FROM popular_actors_in_movie('tt0468569', 5, 0);          -- actors of The Dark Knight by name rating
+  nconst   |       primaryname       | rating |  votes  
+-----------+-------------------------+--------+---------
+ nm0350454 | Maggie Gyllenhaal       |    9.1 | 3210482
+ nm1010931 | Monique Gabriela Curnen |    9.1 | 3210427
+ nm0001173 | Aaron Eckhart           |    9.1 | 3210389
+ nm0212939 | Ron Dean                |    9.1 | 3210389
+ nm0005132 | Heath Ledger            |    8.9 | 3631067
+
+SELECT * FROM similarity_search('tt0468569', 5, 0);                -- movies sharing most genres with The Dark Knight
+  tconst   |      primarytitle      | freq 
+-----------+------------------------+------
+ tt1345836 | The Dark Knight Rises  |    2
+ tt0407887 | The Departed           |    2
+ tt0266697 | Kill Bill: Vol. 1      |    2
+ tt0477348 | No Country for Old Men |    2
+ tt0378194 | Kill Bill: Vol. 2      |    2
+
+------------------------------------------------------------------
+-- D10-D14: word index
+------------------------------------------------------------------
+SELECT * FROM person_words('nm0586568');                           -- 10 most frequent words in his titles
+ word  | freq 
+-------+------
+ world |    6
+ death |    4
+ first |    4
+ goes  |    4
+ must  |    4
+ adam  |    3
+ bond  |    3
+ film  |    3
+ james |    3
+ life  |    3
+
+SELECT * FROM exact_match_search(ARRAY['dog', 'cat'], 5, 0);       -- titles with both words
+   tconst   |                       primarytitle                       
+------------+----------------------------------------------------------
+ tt43658048 | A Fairytale Ending: The Enchanted Dove Tower
+ tt37023608 | A Fairytale Mending: The Enchanted Castle Workshop
+ tt27528897 | A History of Animals 1800's Children's Book Audio Visual
+ tt10284690 | A New Leash on Life
+ tt21410496 | A Pink and Green Christmas
+
+SELECT * FROM exact_match_search(ARRAY['apple', 'apple'], 5, 0);   -- same as searching 'apple' once, not empty
+   tconst   |      primarytitle       
+------------+-------------------------
+ tt37956035 | (Your) Apple Episode 1
+ tt37956084 | (Your) Apple Episode 10
+ tt37961940 | (Your) Apple Episode 11
+ tt37961941 | (Your) Apple Episode 12
+ tt37961943 | (Your) Apple Episode 13
+
+SELECT * FROM any_match_search(ARRAY['dog', 'cat'], 5, 0);         -- titles with either word, rank 2 (both) first
+   tconst   |                       primarytitle                       | rank 
+------------+----------------------------------------------------------+------
+ tt43658048 | A Fairytale Ending: The Enchanted Dove Tower             |    2
+ tt37023608 | A Fairytale Mending: The Enchanted Castle Workshop       |    2
+ tt27528897 | A History of Animals 1800's Children's Book Audio Visual |    2
+ tt10284690 | A New Leash on Life                                      |    2
+ tt21410496 | A Pink and Green Christmas                               |    2
+
+SELECT * FROM words_query(ARRAY['apple']);                         -- 10 words, 'apple' not among them
+  word   | freq 
+---------+------
+ episode |   54
+ life    |   16
+ new     |   15
+ one     |   14
+ love    |   13
+ world   |   13
+ big     |   11
+ earth   |   10
+ get     |   10
+ lang    |   10
+
+SELECT * FROM weights_search(ARRAY['apple', 'dog'], 5, 0);         -- titles ranked by summed weight
+   tconst   |            primarytitle             |       rank       
+------------+-------------------------------------+------------------
+ tt0697686  | The Dog                             | 16.6085386644257
+ tt2231480  | Dylan Dog: Il trillo del diavolo    | 16.6085386644257
+ tt27493669 | Dog of Wisdom II                    | 16.6085386644257
+ tt35050543 | Dog of the Samurai                  | 16.6085386644257
+ tt39292509 | The Seeing Eye Dog Who Saw Too Much | 16.6085386644257
+
+------------------------------------------------------------------
+-- D1: deleting the user
+------------------------------------------------------------------
+SELECT delete_user(:userid) AS deleted;                            -- t
+ deleted 
+---------
+ t
+
+SELECT delete_user(:userid) AS deleted_again;                      -- f
+ deleted_again 
+---------------
+ f
+
+ROLLBACK;
+ROLLBACK

@@ -1,11 +1,11 @@
---=======UPDTE====== 
---rate() and the name + rating trigger
---rate() took the title id as char(10), ignored titles without a row in
---title_ratings and did not check the range. It now takes varchar(10), rejects values outside 1-10, and creates
---the title_ratings row for a title first vote. The trigger applies after
---INSERT as well as UPDATE, creates missing name_ratings rows, and counts each
---title once per person.
---B2 computes name_ratings with the same formula.
+--==========UPDATE==========
+-- rate() and the name rating trigger (in D1_functionality.sql)
+-- rate() took the title id as char(10), ignored titles without a row in title_ratings
+-- and did not check the range. It now takes varchar(10), rejects values outside 1-10,
+-- and creates the title_ratings row for a title's first vote.
+-- The trigger fires after INSERT, UPDATE and DELETE, creates missing name_ratings rows,
+-- and counts each title once per person.
+-- B2 computes name_ratings with the same formula: it counts each (title, person) pair once.
 
 
 

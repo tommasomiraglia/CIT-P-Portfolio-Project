@@ -10,5 +10,14 @@
             "database": "imdb",
             "username": "postgres"
         }
-    ]
+    ],
+    // Biome formats TypeScript and JSON on save and sorts imports, so everyone's code looks the same.
+    "[typescript][javascript][json][jsonc]": {
+        "editor.defaultFormatter": "biomejs.biome",
+        "editor.formatOnSave": true,
+        "editor.codeActionsOnSave": {
+            "source.organizeImports.biome": "explicit",
+            "source.fixAll.biome": "explicit"
+        }
+    }
 }

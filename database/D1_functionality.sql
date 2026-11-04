@@ -1,21 +1,34 @@
 --==========UPDATE==========
---string_search, structured_string_search and search_names wrote to history by themselves. Through the API that would record a make a search once per page, make
---searching impossible without a user, and give a "GET" request a side effect sp now they now only search, they take p_limit and p_offset, order their results
---with tconst and nconst as a tiebreaker so pages are stable, and return. tconst and primarytitle. The backend records a search once,
---for a signed-in user, through the new add_search_history function. Structured_string_search now requires every given field to match "AND",
---as 1.D.4 describes, and returns nothing when all four fields are empty. co_players and search_by_exact_name found the person by name, which is not
---unique; the API addresses a person by nconst, so both are now takeing "p_nconst" , search_by_exact_name is renamed person_words, as in 1D.10 it is stated, takes a
---limit of 10 and counts only title and plot words. co_players and popular_actors_in_movie consider only actor and actress roles and count each
---title or person once, because title_principals repeats person+title pairs. popular_actors_in_movie also returns the number of votes behind the rating.
---All three take p_limit and p_offset and order with a tiebreaker. similarity_search, exact_match_search, any_match_search, words_query and
---weights_search now take p_limit and p_offset and order with a tiebreaker, so every list can be paged for 2.A.3. All of three title searches return the
---title as well as the id, so a client can show a result list without one request per title. exact_match_search counts distinct query words, so a
---repeated word no longer sends an empty result. similarity_search compares only titles of the same type and breaks ties by number of votes. words_query
---counts only title and plot words, leaves out the query words, and takes a limit of 10.
+-- string_search, structured_string_search and search_names used to write to history by themselves.
+-- Through the API that would record a search once per page, make searching impossible without a user,
+-- and give a GET request a side effect. Now they only search: they take p_limit and p_offset,
+-- order their results with tconst or nconst as a tiebreaker so pages are stable, and return tconst and primarytitle.
+-- The backend records a search once, for a signed-in user, through the new add_search_history function.
+-- structured_string_search now requires every given field to match (AND), as 1.D.4 describes,
+-- and returns nothing when all four fields are empty.
+-- co_players and search_by_exact_name found the person by name, which is not unique.
+-- The API addresses a person by nconst, so both now take p_nconst.
+-- search_by_exact_name is renamed person_words, the name used in 1.D.10; it takes a limit of 10
+-- and counts only title and plot words.
+-- co_players and popular_actors_in_movie consider only actor and actress roles and count each title or person once,
+-- because title_principals repeats person+title pairs. popular_actors_in_movie also returns the number of votes
+-- behind the rating. All three take p_limit and p_offset and order with a tiebreaker.
+-- similarity_search, exact_match_search, any_match_search, words_query and weights_search now take p_limit and p_offset
+-- and order with a tiebreaker, so every list can be paged for 2.A.3.
+-- The three title searches return the title as well as the id, so a client can show a result list
+-- without one request per title.
+-- exact_match_search counts distinct query words, so a repeated word no longer gives an empty result.
+-- similarity_search compares only titles of the same type and breaks ties by number of votes.
+-- words_query counts only title and plot words, leaves out the query words, and takes a limit of 10.
 
--- get_user without the password and update_user NULL leaves a field unchanged complete create, read, update and delete for users. 
--- delete_user, the bookmark functions and their remove counterparts return true or false, so the API can tell "created" from "already there" and "deleted" from "not found". 
--- The four functions that list a user's bookmarks, search history nd ratings take p_limit and p_offset and order with a tiebreaker.
+-- get_user (without the password) and update_user (NULL leaves a field unchanged) complete create, read,
+-- update and delete for users.
+-- delete_user, the bookmark functions and their remove counterparts return true or false,
+-- so the API can tell "created" from "already there" and "deleted" from "not found".
+-- The four functions that list a user's bookmarks, search history and ratings take p_limit and p_offset
+-- and order with a tiebreaker.
+-- The name rating trigger also fires on DELETE, because unrate deletes the title_ratings row
+-- when it removes a title's last vote.
 
 DROP FUNCTION IF EXISTS create_user(TEXT, TEXT, TEXT, TEXT, INTEGER, INTEGER);
 DROP FUNCTION IF EXISTS delete_user(INTEGER);
@@ -69,7 +82,7 @@ DROP FUNCTION IF EXISTS add_genre_preference(INTEGER, INTEGER);
 DROP FUNCTION IF EXISTS remove_genre_preference(INTEGER, INTEGER);
 DROP FUNCTION IF EXISTS get_genre_preferences(INTEGER, INTEGER, INTEGER);
 
--- Convert wi.tconst from char(10) to varchar(10 if it is not done yet
+-- Convert wi.tconst from char(10) to varchar(10) if it is not done yet
 DO $$
 BEGIN
   IF (SELECT data_type FROM information_schema.columns
@@ -101,7 +114,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
--- Returns false when there ws no such user so the API can answer 404.
+-- Returns false when there was no such user, so the API can answer 404.
 CREATE OR REPLACE FUNCTION delete_user(p_userid INTEGER)
 RETURNS BOOLEAN AS $$
 BEGIN
@@ -465,7 +478,7 @@ $$ LANGUAGE plpgsql;
 
 
 --D6
---The person is identified by nconst so the names are not unique.
+--The person is identified by nconst, because names are not unique.
 CREATE OR REPLACE FUNCTION co_players(p_nconst VARCHAR(10), p_limit INTEGER, p_offset INTEGER)
 RETURNS TABLE(nconst VARCHAR(10), primaryname TEXT, freq BIGINT) AS $$
 BEGIN
@@ -529,8 +542,9 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
+-- DELETE is needed too: unrate deletes the title_ratings row when it removes the last vote.
 CREATE TRIGGER update_name_rating_trigger
-AFTER INSERT OR UPDATE ON title_ratings
+AFTER INSERT OR UPDATE OR DELETE ON title_ratings
 FOR EACH ROW
 EXECUTE FUNCTION update_name_ratings_after_rate();
 
