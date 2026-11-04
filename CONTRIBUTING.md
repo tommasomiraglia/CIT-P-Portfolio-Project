@@ -77,9 +77,9 @@ When you change a function the API uses:
 
 ## Git
 
-- `develop` is the shared branch where finished work comes together.
-- Never work on `main` or `develop` directly: one branch per task, created from `develop`, for example `names-endpoints`.
+- `main` is the shared branch where finished work comes together.
+- Never work on `main` directly: one branch per task, created from `main`, for example `names-endpoints`.
 - Small commits, one topic each.
 - Before pushing, from `backend/`: `npm run lint`, `npm run build` and `npm test` must pass.
   `npm run lint:fix` fixes most lint and formatting problems by itself.
-- When the task is done, merge `develop` into your branch first and run the checks again, then merge your branch into `develop` and push.
+- When the task is done, merge `main` into your branch first and run the checks again, then merge your branch into `main` and push.
