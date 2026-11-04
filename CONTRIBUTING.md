@@ -1,7 +1,7 @@
 # Contributing
 
 The rules we all follow.
-To change one, agree on it as a group and update this file.
+To change one, update this file.
 
 ## Tools
 
@@ -39,6 +39,5 @@ Packages are pinned to exact, stable versions (`backend/.npmrc` does this for `n
 
 - Never work on `main`: one branch per task.
 - Small commits, one topic each.
-- Merge through a pull request reviewed by another group member.
 - Before pushing, from `backend/`: `npm run lint`, `npm run build` and `npm test` must pass.
   `npm run lint:fix` fixes most lint and formatting problems by itself.
