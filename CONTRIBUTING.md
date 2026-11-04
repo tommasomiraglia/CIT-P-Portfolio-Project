@@ -19,6 +19,23 @@ Biome does both jobs in one tool and does not depend on the TypeScript version.
 
 Packages are pinned to exact, stable versions (`backend/.npmrc` does this for `npm install`), so everyone runs the same code.
 
+## Backend layers
+
+A request goes through the layers from top to bottom.
+A layer may only call the layer directly below it, never one above.
+
+| Folder in `backend/src/` | Does | Never does |
+| --- | --- | --- |
+| `routes/` | Maps a URL and HTTP method to a controller. One router per resource. | Logic of any kind |
+| `controllers/` | Validates path and query parameters (400 when invalid), calls the service, sends the JSON. | SQL, business rules |
+| `services/` | Business rules: for example "log the search when the user is logged in", "hash the password". Throws `NotFoundError` and the other errors in `middleware/errors.ts`. | Anything about HTTP (`req`, `res`) |
+| `repositories/` | All SQL, through the shared pool. Returns raw rows. | Building the JSON the API sends |
+| `mappers/` | Turns a database row into the object the API sends: camelCase names, a `url` field, `null` for missing values. | SQL |
+| `types/` | The row type (`TitleRow`) and the API type (`TitleDto`) of each resource. | Code |
+
+`middleware/` holds what runs for every request, such as the error handler.
+`src/scripts/` holds developer tools such as `db-check.ts`, which are not part of the API.
+
 ## Code rules
 
 - **Clear names**: `findTitleById`, not `getData`.
@@ -33,11 +50,36 @@ Packages are pinned to exact, stable versions (`backend/.npmrc` does this for `n
   ```
 
 - **SQL only in `src/repositories/`**.
+  The one exception is `src/scripts/`, whose developer tools are not part of the API.
+- **Errors are thrown, not handled**: throw an error from `middleware/errors.ts` and let the error handler send it.
+  Never write `try/catch` in a controller just to send an error response.
+- **Error messages are shown to the client**, so they never contain SQL, table names or stack traces.
 - **Secrets only in `backend/.env`**, never in git. New settings go in `.env.example` and `src/config/index.ts` too.
+
+## Tests
+
+Tests live in `backend/test/` and run with `npm test`.
+
+- **Mappers and other code without the database**: a unit test, like `title.mapper.test.ts`.
+- **Every endpoint**: at least one API test with supertest in `api.test.ts` or a new `<resource>.api.test.ts`.
+  Test the success case and each error status the endpoint can return.
+- **Tests that write to the database** run inside a transaction that is rolled back at the end, so they leave no rows behind and give the same result every run.
+
+## Database changes
+
+The API calls the functions in `database/D1_functionality.sql`, so changing one can break the backend.
+When you change a function the API uses:
+
+1. Update the repository that calls it, and run `npm test`.
+2. Add a line to `database/CHANGES.md` saying what changed and why.
+   That file becomes the "changes to Subproject 1" section of the report.
+3. Tell the group, because everyone has to rerun the changed script on their own database.
 
 ## Git
 
-- Never work on `main`: one branch per task.
+- `develop` is the shared branch where finished work comes together.
+- Never work on `main` or `develop` directly: one branch per task, created from `develop`, for example `names-endpoints`.
 - Small commits, one topic each.
 - Before pushing, from `backend/`: `npm run lint`, `npm run build` and `npm test` must pass.
   `npm run lint:fix` fixes most lint and formatting problems by itself.
+- When the task is done, merge `develop` into your branch first and run the checks again, then merge your branch into `develop` and push.

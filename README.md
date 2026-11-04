@@ -2,6 +2,31 @@
 
 A movie application on IMDB data: a PostgreSQL database (`database/`), a REST API (`backend/`), and later a React frontend.
 The assignment is in `docs/project-description.pdf`.
+The rules for working on the code are in [CONTRIBUTING.md](CONTRIBUTING.md).
+
+## Project structure
+
+```text
+database/           Subproject 1: SQL scripts that build the database
+  CHANGES.md        What we changed in Subproject 1 for the API, and why
+backend/            Subproject 2: the REST API (TypeScript, Express)
+  src/
+    routes/         URL -> controller, one router per resource
+    controllers/    Validate the request, call the service, send the JSON
+    services/       Business rules
+    repositories/   All SQL
+    mappers/        Database row -> JSON the API sends
+    types/          Row and API types of each resource
+    middleware/     Error handling and other code that runs for every request
+    config/         Reads backend/.env
+    db/             The shared connection pool
+    scripts/        Developer tools (db-check)
+  test/             Vitest tests
+docs/               Assignment and reports
+```
+
+A request goes down the layers in this order: routes, controllers, services, repositories.
+The repository's rows come back up through the mapper.
 
 ## Requirements
 
@@ -24,6 +49,8 @@ psql -h localhost -U postgres -d imdb -f .\database\D2_indexes.sql
 ```
 
 B2 drops the raw tables, so it only works on a freshly loaded database.
+When someone changes one of these scripts, rebuild your database from scratch in the same order.
+What changed since Subproject 1 is in `database/CHANGES.md`.
 
 `database/F1_test.sql` tests the functions.
 It runs in one transaction that it rolls back, so it leaves no rows behind, and it stops with `FAIL: ...` when a check fails.
@@ -42,6 +69,9 @@ copy .env.example .env    # then put your database password in .env
 ```
 
 `PORT` in `.env` sets the port of the API. It is optional and defaults to 3000.
+
+In VS Code, install the extensions EditorConfig and Biome when VS Code suggests them.
+Biome then formats TypeScript and JSON files every time you save.
 
 ## 3. Check that everything works
 
@@ -88,6 +118,7 @@ It finishes the requests in progress and closes the database connections before 
 
 The tests use the database configured in `backend/.env`, so step 1 must be done and PostgreSQL must be running.
 They only read from it.
+`test/title.mapper.test.ts` tests code that does not touch the database, and `test/api.test.ts` sends real HTTP requests to the API.
 
 ## Endpoints
 
