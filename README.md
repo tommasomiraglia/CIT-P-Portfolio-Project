@@ -23,6 +23,7 @@ backend/            Subproject 2: the REST API (TypeScript, Express)
     scripts/        Developer tools (db-check)
   test/             Vitest tests
 docs/               Assignment and reports
+  api-design.md     Decisions on URLs, JSON, paging and login
 ```
 
 A request goes down the layers in this order: routes, controllers, services, repositories.

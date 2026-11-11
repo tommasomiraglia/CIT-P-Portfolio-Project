@@ -36,6 +36,11 @@ A layer may only call the layer directly below it, never one above.
 `middleware/` holds what runs for every request, such as the error handler.
 `src/scripts/` holds developer tools such as `db-check.ts`, which are not part of the API.
 
+## API design
+
+URLs, JSON fields, paging and authentication follow [docs/api-design.md](docs/api-design.md).
+A new endpoint that needs a different rule changes that file first.
+
 ## Code rules
 
 - **Clear names**: `findTitleById`, not `getData`.
