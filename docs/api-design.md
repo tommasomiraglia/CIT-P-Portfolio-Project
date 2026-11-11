@@ -138,6 +138,7 @@ The repository calls the database function with `p_limit = pageSize + 1` and `p_
 | `page` | Integer, 1 or more. Missing means 1. |
 | `pageSize` | Integer, 1 or more. Missing means 20. |
 | `pageSize` above 100 | The default, 20, is applied. |
+| `page` so large that the offset no longer fits in the functions' `INTEGER` `p_offset` | `400` |
 | Anything else (`page=0`, `pageSize=abc`) | `400` |
 
 **Why page numbers and not cursors:** every database function already takes `p_limit` and `p_offset`, and page numbers let the frontend jump to any page.

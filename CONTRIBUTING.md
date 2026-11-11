@@ -34,6 +34,7 @@ A layer may only call the layer directly below it, never one above.
 | `types/` | The row type (`TitleRow`) and the API type (`TitleDto`) of each resource. | Code |
 
 `middleware/` holds what runs for every request, such as the error handler.
+`lib/` holds pure helpers that several layers use, such as paging in `lib/paging.ts`; they never touch SQL or `req`/`res`.
 `src/scripts/` holds developer tools such as `db-check.ts`, which are not part of the API.
 
 ## API design
