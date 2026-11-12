@@ -55,6 +55,10 @@ A new endpoint that needs a different rule changes that file first.
   pool.query(`SELECT * FROM title_basic WHERE tconst = '${id}'`);    // never
   ```
 
+- **Operations that must succeed or fail together run in one transaction** (2-D.4), for example saving a rating and its comment.
+  The service calls `withTransaction` from `src/db/transaction.ts` and passes the client it receives to each repository function.
+  Repository functions therefore take a `Queryable` as their first parameter: `pool` on its own, or the transaction's client.
+
 - **SQL only in `src/repositories/`**.
   The one exception is `src/scripts/`, whose developer tools are not part of the API.
 - **Errors are thrown, not handled**: throw an error from `middleware/errors.ts` and let the error handler send it.
