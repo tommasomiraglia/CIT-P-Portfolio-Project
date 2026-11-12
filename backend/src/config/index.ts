@@ -4,6 +4,9 @@
 // Optional: the HTTP port has a sensible default, unlike the database credentials.
 const DEFAULT_PORT = 3000;
 
+// Optional: where the frontend runs during development. 5173 is the port of Vite's dev server.
+const DEFAULT_CORS_ORIGINS = ['http://localhost:5173'];
+
 const REQUIRED_VARIABLES = ['DB_HOST', 'DB_PORT', 'DB_NAME', 'DB_USER', 'DB_PASSWORD'] as const;
 
 type RequiredVariable = (typeof REQUIRED_VARIABLES)[number];
@@ -18,6 +21,8 @@ export interface DatabaseConfig {
 
 export interface AppConfig {
   port: number;
+  // Web pages served from these origins may call the API from the browser (2-D.7).
+  corsOrigins: string[];
   db: DatabaseConfig;
 }
 
@@ -66,12 +71,35 @@ function parsePort(name: string, value: string): number {
   return port;
 }
 
+// An origin is scheme, host and port only, for example "http://localhost:5173".
+// A trailing slash or a path would never equal the Origin header a browser sends,
+// so the frontend would be blocked with no clear reason; better to fail at startup.
+function parseOrigins(name: string, value: string): string[] {
+  const origins = value
+    .split(',')
+    .map((origin) => origin.trim())
+    .filter((origin) => origin !== '');
+  for (const origin of origins) {
+    if (!URL.canParse(origin) || new URL(origin).origin !== origin) {
+      throw new ConfigError(
+        `${name} must be a comma-separated list of origins like "http://localhost:5173", got "${origin}".`,
+      );
+    }
+  }
+  if (origins.length === 0) {
+    throw new ConfigError(`${name} is set but lists no origin.`);
+  }
+  return origins;
+}
+
 function loadConfig(): AppConfig {
   loadEnvFile();
   const env = readRequired();
   const port = process.env.PORT?.trim();
+  const corsOrigins = process.env.CORS_ORIGINS?.trim();
   return {
     port: port ? parsePort('PORT', port) : DEFAULT_PORT,
+    corsOrigins: corsOrigins ? parseOrigins('CORS_ORIGINS', corsOrigins) : DEFAULT_CORS_ORIGINS,
     db: {
       host: env.DB_HOST,
       port: parsePort('DB_PORT', env.DB_PORT),

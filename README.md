@@ -70,6 +70,8 @@ copy .env.example .env    # then put your database password in .env
 ```
 
 `PORT` in `.env` sets the port of the API. It is optional and defaults to 3000.
+`CORS_ORIGINS` lists the web pages allowed to call the API from a browser, separated by commas.
+It is optional and defaults to `http://localhost:5173`, where the frontend's dev server runs.
 
 In VS Code, install the extensions EditorConfig and Biome when VS Code suggests them.
 Biome then formats TypeScript and JSON files every time you save.

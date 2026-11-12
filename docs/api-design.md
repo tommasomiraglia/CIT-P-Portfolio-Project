@@ -227,3 +227,22 @@ Verifying identity and deciding what the caller may do are separate middlewares 
   An optional variant sets `req.user` when a valid token is present and lets anonymous requests through, for the searches that save history.
 - `authorizeSelf` runs after `authenticate` on every `/api/users/:userId/...` route except registration.
   It answers `403` when `req.user` is not `:userId`.
+
+## 5. Cross-origin requests (CORS)
+
+The frontend of Subproject 3 is served from a different origin than the API (2-D.7), so the browser only lets it read API responses if the API allows that origin.
+The policy is in `backend/src/middleware/cors.ts`:
+
+| Setting | Value | Why |
+| --- | --- | --- |
+| Allowed origins | `CORS_ORIGINS` in `backend/.env`, default `http://localhost:5173` (Vite's dev server) | Only our frontend, not `*`. A new deployment adds its origin to the setting without a code change. |
+| Methods | `GET`, `POST`, `PUT`, `PATCH`, `DELETE` | The methods of section 1.6. |
+| Request headers | `Content-Type`, `Authorization` | JSON bodies and the bearer token (4.2). |
+| Exposed response headers | `Location` | The frontend must read the URI of a resource created with `POST`. |
+| Credentials | Off | The token travels in a header, not a cookie. |
+| Preflight cache | 1 hour | The browser does not repeat the `OPTIONS` request before every call. |
+
+The CORS middleware runs first, so error responses carry the headers too and the frontend can read their message.
+
+**Limitation:** CORS only restricts browsers.
+Any other client can still call the API, so it is not a security boundary; authentication (section 4) is.
