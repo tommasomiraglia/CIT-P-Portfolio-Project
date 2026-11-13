@@ -33,6 +33,8 @@ The REST API calls them on every request, which exposed four problems:
 - `string_search`, `structured_string_search` and `search_names` no longer take `p_userid` and no longer insert into `history`.
 - The new function `add_search_history(userid, value)` records a search; the backend calls it once per search, only for a signed-in user.
 - `structured_string_search` now requires every non-empty field to match (`AND`), as 1.D.4 describes, and returns nothing when all four fields are empty.
+- `string_search` matches with `ILIKE` instead of `LIKE`, so it ignores case like the other searches.
+  Before, `twilight zone` found nothing while `Twilight Zone` found 17 titles, so a user typing in lowercase missed most results.
 
 ### Paging and stable order
 

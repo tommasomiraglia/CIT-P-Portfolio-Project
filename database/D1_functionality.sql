@@ -332,8 +332,8 @@ BEGIN
     RETURN QUERY
         SELECT tb.tconst, tb.primarytitle
         FROM title_basic tb
-        WHERE tb.primarytitle LIKE '%' || p_query || '%'
-           OR tb.plot         LIKE '%' || p_query || '%'
+        WHERE tb.primarytitle ILIKE '%' || p_query || '%'
+           OR tb.plot         ILIKE '%' || p_query || '%'
         ORDER BY tb.primarytitle, tb.tconst
         LIMIT p_limit OFFSET p_offset;
 END;
