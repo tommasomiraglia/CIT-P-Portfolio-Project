@@ -28,6 +28,10 @@ export const notFoundHandler: RequestHandler = (req, _res, next) => {
 // even though it is unused.
 export const errorHandler: ErrorRequestHandler = (error: unknown, _req, res, _next) => {
   if (error instanceof HttpError || isExposableClientError(error)) {
+    if (error.status === 401) {
+      // The HTTP standard requires every 401 to say which kind of credentials to send.
+      res.set('WWW-Authenticate', 'Bearer');
+    }
     res.status(error.status).json({ error: { message: error.message } });
     return;
   }

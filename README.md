@@ -69,6 +69,16 @@ npm install
 copy .env.example .env    # then put your database password in .env
 ```
 
+`.env` also needs a `JWT_SECRET`, the key that signs login tokens.
+Generate your own, and never share or commit it:
+
+```powershell
+node -e "console.log(require('crypto').randomBytes(32).toString('base64url'))"
+```
+
+Paste the output after `JWT_SECRET=` in `.env`.
+The API refuses to start without it.
+
 `PORT` in `.env` sets the port of the API. It is optional and defaults to 3000.
 `CORS_ORIGINS` lists the web pages allowed to call the API from a browser, separated by commas.
 It is optional and defaults to `http://localhost:5173`, where the frontend's dev server runs.
@@ -120,8 +130,8 @@ Stop the server with Ctrl+C.
 It finishes the requests in progress and closes the database connections before exiting.
 
 The tests use the database configured in `backend/.env`, so step 1 must be done and PostgreSQL must be running.
-They only read from it.
-`test/title.mapper.test.ts` tests code that does not touch the database, and `test/api.test.ts` sends real HTTP requests to the API.
+Tests that write delete what they created, so the database stays as it was.
+Files ending in `.api.test.ts`, and `api.test.ts`, send real HTTP requests to the API; the others test one part on its own.
 
 ## Endpoints
 
@@ -129,6 +139,9 @@ They only read from it.
 | --- | --- |
 | `GET /api/health` | `200 {"status":"ok"}`, or `503` if the database does not answer |
 | `GET /api/titles/:id` | `200` with the title, `400` if `:id` is not a title id like `tt0052520`, `404` if no title has that id |
+| `POST /api/users` | Registers a user: `201` with the user and a `Location` header, `400` for an invalid field, `409` if the username or email is taken |
+| `POST /api/auth/login` | `200` with a token and the user, `401` for a wrong username or password |
+| `GET /api/users/:userId` | Needs `Authorization: Bearer <token>` for that same user: `200` with the user, `401` without a valid token, `403` for another user |
 
 Example:
 

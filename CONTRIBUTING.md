@@ -13,6 +13,8 @@ To change one, update this file.
 | Biome (formatting and linting), VS Code format on save (needs the VS Code extension Biome) | In place |
 | Express 5 | In place |
 | Vitest and supertest (tests) | In place |
+| `cors` (CORS middleware) | In place |
+| `argon2` (password hashing) and `jose` (login tokens) | In place |
 
 We use Biome instead of Prettier and ESLint because typescript-eslint does not support TypeScript 7 yet.
 Biome does both jobs in one tool and does not depend on the TypeScript version.
@@ -73,7 +75,10 @@ Tests live in `backend/test/` and run with `npm test`.
 - **Mappers and other code without the database**: a unit test, like `title.mapper.test.ts`.
 - **Every endpoint**: at least one API test with supertest in `api.test.ts` or a new `<resource>.api.test.ts`.
   Test the success case and each error status the endpoint can return.
-- **Tests that write to the database** run inside a transaction that is rolled back at the end, so they leave no rows behind and give the same result every run.
+- **Tests that write to the database** leave no rows behind and give the same result every run:
+  - Repository tests run inside a transaction that is rolled back at the end, like `user.repository.test.ts`.
+  - API tests cannot do that, because the app takes its own connections from the pool.
+    They give every row they create a name with a prefix unique to the run, and delete those rows in `afterAll`, like `users.api.test.ts`.
 
 ## Database changes
 

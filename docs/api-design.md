@@ -226,7 +226,49 @@ Verifying identity and deciding what the caller may do are separate middlewares 
   It answers `401` when the header is missing or the token is invalid or expired.
   An optional variant sets `req.user` when a valid token is present and lets anonymous requests through, for the searches that save history.
 - `authorizeSelf` runs after `authenticate` on every `/api/users/:userId/...` route except registration.
-  It answers `403` when `req.user` is not `:userId`.
+  It answers `400` when `:userId` is not a positive integer, and `403` when `req.user` is not `:userId`.
+
+The optional variant still answers `401` for a token that is present but invalid or expired.
+Ignoring it would quietly turn a logged-in search into an anonymous one, and the client would never learn that its token had expired.
+
+Every `401` carries the header `WWW-Authenticate: Bearer`, as the HTTP standard asks, so a client can see which kind of credentials the API expects.
+
+### 4.5 Registration and the user resource
+
+`POST /api/users` takes a JSON body:
+
+| Field | Rule |
+| --- | --- |
+| `username` | Required. 3 to 30 characters: letters, digits, `_`, `.` and `-`. |
+| `email` | Required. At most 254 characters, one `@` with text on both sides and no spaces. Stored in lowercase. |
+| `password` | Required. 8 to 128 characters, with no rules about which characters. |
+| `phoneNumber` | Optional, `null` when missing. At most 30 characters: digits, spaces, `+`, `-`, `(` and `)`. |
+
+Other fields are ignored.
+A missing or invalid field is a `400` whose message names the field.
+A username or email that is already taken is a `409` that says which one.
+
+The answer is `201`, with the header `Location: /api/users/7` and the user:
+
+```json
+{ "url": "/api/users/7", "id": 7, "username": "tommaso", "email": "tommaso@example.com", "phoneNumber": null }
+```
+
+`GET /api/users/:userId` and the `user` field of the login answer use the same representation.
+`langid` and `regionid` from the database are not part of it yet: there are no language or region resources for them to link to (2.4).
+
+**Why these rules:**
+
+- The password rules follow NIST SP 800-63B, the US government's guidance on passwords: a minimum length matters more than rules such as "one digit and one symbol", which mostly make people choose predictable passwords.
+  The maximum keeps a client from sending a megabyte to hash.
+- Emails are stored in lowercase so that `Tom@example.com` and `tom@example.com` cannot become two accounts.
+  Usernames keep their case, as the `UNIQUE` constraint in the database does, so `Tom` and `tom` are different users.
+
+**Logging in as a user who does not exist** takes as long as a wrong password: the server checks the password against a dummy hash.
+Otherwise the faster answer would tell an attacker that the username does not exist, which the identical message (4.2) is meant to hide.
+
+**A user deleted after logging in** still has a valid token (4.3).
+`GET /api/users/:userId` then answers `401`, not `404`: the token no longer identifies anyone.
 
 ## 5. Cross-origin requests (CORS)
 

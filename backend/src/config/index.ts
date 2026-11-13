@@ -7,7 +7,18 @@ const DEFAULT_PORT = 3000;
 // Optional: where the frontend runs during development. 5173 is the port of Vite's dev server.
 const DEFAULT_CORS_ORIGINS = ['http://localhost:5173'];
 
-const REQUIRED_VARIABLES = ['DB_HOST', 'DB_PORT', 'DB_NAME', 'DB_USER', 'DB_PASSWORD'] as const;
+const REQUIRED_VARIABLES = [
+  'DB_HOST',
+  'DB_PORT',
+  'DB_NAME',
+  'DB_USER',
+  'DB_PASSWORD',
+  'JWT_SECRET',
+] as const;
+
+// HS256 signs with a 256-bit key, so a shorter secret would be the weakest part.
+// 32 characters of random base64 hold more than 256 bits.
+const MIN_JWT_SECRET_LENGTH = 32;
 
 type RequiredVariable = (typeof REQUIRED_VARIABLES)[number];
 
@@ -23,6 +34,9 @@ export interface AppConfig {
   port: number;
   // Web pages served from these origins may call the API from the browser (2-D.7).
   corsOrigins: string[];
+  // Signs and verifies login tokens (docs/api-design.md section 4.2). Anyone who knows it
+  // can create a token for any user, so it only ever lives in backend/.env.
+  jwtSecret: string;
   db: DatabaseConfig;
 }
 
@@ -92,6 +106,16 @@ function parseOrigins(name: string, value: string): string[] {
   return origins;
 }
 
+function checkJwtSecret(value: string): string {
+  if (value.length < MIN_JWT_SECRET_LENGTH) {
+    throw new ConfigError(
+      `JWT_SECRET must be at least ${MIN_JWT_SECRET_LENGTH} characters long. Generate one with: ` +
+        `node -e "console.log(require('crypto').randomBytes(32).toString('base64url'))"`,
+    );
+  }
+  return value;
+}
+
 function loadConfig(): AppConfig {
   loadEnvFile();
   const env = readRequired();
@@ -100,6 +124,7 @@ function loadConfig(): AppConfig {
   return {
     port: port ? parsePort('PORT', port) : DEFAULT_PORT,
     corsOrigins: corsOrigins ? parseOrigins('CORS_ORIGINS', corsOrigins) : DEFAULT_CORS_ORIGINS,
+    jwtSecret: checkJwtSecret(env.JWT_SECRET),
     db: {
       host: env.DB_HOST,
       port: parsePort('DB_PORT', env.DB_PORT),
