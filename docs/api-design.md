@@ -86,6 +86,15 @@ Combining `search`, the structured parameters and `words` in one request is a `4
 
 Errors: `400` invalid parameter or body, `401` missing or invalid token, `403` token for a different user, `404` unknown resource or route, `409` username or email already taken, `500` unexpected failure.
 
+### 1.7 Title search: `GET /api/titles?search=`
+
+- `search` is required here, trimmed, and 1 to 200 characters; anything else is a `400`.
+  The structured and word searches of 1.5 will add their own parameters to the same collection.
+- It matches titles whose title or plot contains the text, ignoring case.
+- A logged-in search (a valid token is sent) is saved to the user's history, an anonymous one is not.
+  Only the request for page 1 is saved: following `next` is still the same search.
+- A token that is sent but invalid is a `401`, also here (4.4).
+
 ## 2. JSON representations
 
 ### 2.1 Plain JSON with `url` fields
@@ -125,6 +134,20 @@ Every error has the same shape, with the matching HTTP status (2-B.2, 2-D.5):
 ```
 
 Messages never contain SQL, table names or stack traces (2-A.4).
+
+### 2.6 Representations
+
+**Title in a list** (the items of `GET /api/titles?search=`):
+
+| Field | Type | Meaning |
+| --- | --- | --- |
+| `url` | string | URI of the title, `/api/titles/:id` |
+| `id` | string | IMDB id, for example `tt0052520` |
+| `title` | string | Primary title |
+
+The client follows `url` for the full title.
+
+**User**: see 4.5.
 
 ## 3. Paging
 

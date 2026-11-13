@@ -1,5 +1,5 @@
 // Converts a title row from the database into the TitleDto the API sends.
-import type { TitleDto, TitleRow } from '../types/title.js';
+import type { TitleDto, TitleRow, TitleSearchRow, TitleSummaryDto } from '../types/title.js';
 
 // The OMDB import stores "N/A" (and sometimes an empty string) where a value is unknown.
 // The API uses null for every missing value, so clients only have one case to handle.
@@ -19,5 +19,13 @@ export function toTitleDto(row: TitleRow): TitleDto {
     runtimeMinutes: row.runtimeminutes,
     plot: textOrNull(row.plot),
     posterUrl: textOrNull(row.poster_link),
+  };
+}
+
+export function toTitleSummaryDto(row: TitleSearchRow): TitleSummaryDto {
+  return {
+    url: `/api/titles/${row.tconst}`,
+    id: row.tconst,
+    title: row.primarytitle,
   };
 }

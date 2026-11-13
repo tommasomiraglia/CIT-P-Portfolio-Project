@@ -24,6 +24,7 @@ backend/            Subproject 2: the REST API (TypeScript, Express)
   test/             Vitest tests
 docs/               Assignment and reports
   api-design.md     Decisions on URLs, JSON, paging and login
+  user-stories.md   What the application lets people do, and the endpoints each story needs
 ```
 
 A request goes down the layers in this order: routes, controllers, services, repositories.
@@ -139,6 +140,7 @@ Files ending in `.api.test.ts`, and `api.test.ts`, send real HTTP requests to th
 | --- | --- |
 | `GET /api/health` | `200 {"status":"ok"}`, or `503` if the database does not answer |
 | `GET /api/titles/:id` | `200` with the title, `400` if `:id` is not a title id like `tt0052520`, `404` if no title has that id |
+| `GET /api/titles?search=…` | `200` with one page of matching titles (`page`, `pageSize`), `400` for a missing or invalid parameter; saved to the history when a token is sent |
 | `POST /api/users` | Registers a user: `201` with the user and a `Location` header, `400` for an invalid field, `409` if the username or email is taken |
 | `POST /api/auth/login` | `200` with a token and the user, `401` for a wrong username or password |
 | `GET /api/users/:userId` | Needs `Authorization: Bearer <token>` for that same user: `200` with the user, `401` without a valid token, `403` for another user |

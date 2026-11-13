@@ -28,3 +28,16 @@ export interface TitleDto {
   plot: string | null;
   posterUrl: string | null;
 }
+
+// One row of string_search(): just enough to list a title in search results.
+export interface TitleSearchRow {
+  tconst: string;
+  primarytitle: string;
+}
+
+// A title as an element of a list. The client follows `url` for the full TitleDto.
+export interface TitleSummaryDto {
+  url: string;
+  id: string;
+  title: string;
+}
