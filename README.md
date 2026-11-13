@@ -25,6 +25,7 @@ backend/            Subproject 2: the REST API (TypeScript, Express)
 docs/               Assignment and reports
   api-design.md     Decisions on URLs, JSON, paging and login
   user-stories.md   What the application lets people do, and the endpoints each story needs
+  report/           Draft sections of the Subproject 2 report
 ```
 
 A request goes down the layers in this order: routes, controllers, services, repositories.
