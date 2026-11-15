@@ -25,6 +25,7 @@ backend/            Subproject 2: the REST API (TypeScript, Express)
 docs/               Assignment and reports
   api-design.md     Decisions on URLs, JSON, paging and login
   user-stories.md   What the application lets people do, and the endpoints each story needs
+  ratings-endpoints.md  How the rating endpoints were built, and why
   report/           Draft sections of the Subproject 2 report
 ```
 
@@ -145,6 +146,10 @@ Files ending in `.api.test.ts`, and `api.test.ts`, send real HTTP requests to th
 | `POST /api/users` | Registers a user: `201` with the user and a `Location` header, `400` for an invalid field, `409` if the username or email is taken |
 | `POST /api/auth/login` | `200` with a token and the user, `401` for a wrong username or password |
 | `GET /api/users/:userId` | Needs `Authorization: Bearer <token>` for that same user: `200` with the user, `401` without a valid token, `403` for another user |
+| `GET /api/users/:userId/ratings` | Same token rules. `200` with one page of the user's ratings (`page`, `pageSize`) |
+| `GET /api/users/:userId/ratings/:titleId` | Same token rules. `200` with the user's rating of that title, `404` if they have not rated it |
+| `PUT /api/users/:userId/ratings/:titleId` | Same token rules. Body `{ "rating": 1-10, "comment": "..." }`: `200` with the rating, `400` for an invalid rating or comment, `404` if no title has that id |
+| `DELETE /api/users/:userId/ratings/:titleId` | Same token rules. `204`, or `404` if there was no rating |
 
 Example:
 

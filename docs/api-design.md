@@ -63,6 +63,7 @@ Ids are validated before use (2-D.2): titles match `tt` plus 7 or 8 digits, peop
 | `GET /api/users/:userId/bookmarks/people` | `get_bookmarked_persons` | Same user |
 | `PUT`, `DELETE /api/users/:userId/bookmarks/people/:personId` | `bookmark_person`, `remove_bookmark_person` | Same user |
 | `GET /api/users/:userId/ratings` | `get_rating_history` | Same user |
+| `GET /api/users/:userId/ratings/:titleId` | - | Same user |
 | `PUT`, `DELETE /api/users/:userId/ratings/:titleId` | `rate` and `set_rating_comment`, `unrate` | Same user |
 | `GET`, `DELETE /api/users/:userId/search-history` | `get_search_history`, `clear_search_history` | Same user |
 | `DELETE /api/users/:userId/search-history/:entryId` | `delete_search_history_entry` | Same user |
@@ -94,6 +95,26 @@ Errors: `400` invalid parameter or body, `401` missing or invalid token, `403` t
 - A logged-in search (a valid token is sent) is saved to the user's history, an anonymous one is not.
   Only the request for page 1 is saved: following `next` is still the same search.
 - A token that is sent but invalid is a `401`, also here (4.4).
+
+### 1.8 Ratings: `/api/users/:userId/ratings`
+
+`PUT /api/users/:userId/ratings/:titleId` takes a JSON body:
+
+| Field | Rule |
+| --- | --- |
+| `rating` | Required. A JSON whole number from 1 to 10; `"8"` and `7.5` are a `400`. |
+| `comment` | Optional. `null` or a text of at most 2000 characters. It is trimmed, and a missing or empty comment is stored as `null`. |
+
+Other fields are ignored.
+
+- `PUT` replaces the whole rating: sending a new rating without a comment removes the old comment.
+  The frontend sends both fields from one form, so nothing is lost, and a `PUT` that kept half of the old resource would not be a replacement.
+- The rating and the comment are saved in one transaction (2-D.4): either both are stored or neither is.
+- The answer is `200` with the rating, for a first rating as well as a changed one (1.6).
+- A title that does not exist is a `404`; so are `GET` and `DELETE` for a title the user has not rated.
+- `GET /api/users/:userId/ratings` is ordered by title, as `get_rating_history` returns it.
+- `GET /api/users/:userId/ratings/:titleId` has no database function: the repository reads the one row itself.
+  It exists so that a title page can show the user's own rating without paging through the whole list.
 
 ## 2. JSON representations
 
@@ -146,6 +167,15 @@ Messages never contain SQL, table names or stack traces (2-A.4).
 | `title` | string | Primary title |
 
 The client follows `url` for the full title.
+
+**Rating** (`GET` and `PUT /api/users/:userId/ratings/:titleId`, and the items of `GET /api/users/:userId/ratings`):
+
+| Field | Type | Meaning |
+| --- | --- | --- |
+| `url` | string | URI of the rating, `/api/users/:userId/ratings/:titleId` |
+| `title` | object | The rated title: `{ "url": "/api/titles/tt0052520", "name": "The Twilight Zone" }` (2.4) |
+| `rating` | number | Whole number from 1 to 10 |
+| `comment` | string or `null` | The user's comment |
 
 **User**: see 4.5.
 
