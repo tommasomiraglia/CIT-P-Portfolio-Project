@@ -2,6 +2,7 @@
 import { Router } from 'express';
 import { createUser, getUserById } from '../controllers/user.controller.js';
 import { authenticate, authorizeSelf } from '../middleware/auth.js';
+import { ratingRouter } from './rating.routes.js';
 
 export const userRouter = Router();
 
@@ -13,5 +14,6 @@ userRouter.post('/', createUser);
 // mergeParams lets the routes below read :userId from the path above.
 const ownUserRouter = Router({ mergeParams: true });
 ownUserRouter.get('/', getUserById);
+ownUserRouter.use('/ratings', ratingRouter);
 
 userRouter.use('/:userId', authenticate, authorizeSelf, ownUserRouter);

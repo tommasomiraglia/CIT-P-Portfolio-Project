@@ -65,6 +65,19 @@ export async function findUserById(db: Queryable, userId: number): Promise<UserR
   return result.rows[0];
 }
 
+// Locks the user's row until the surrounding transaction ends, and returns false when the
+// user does not exist. Two transactions that lock the same user run one after the other,
+// so a service can read a user's data and then write it without another request of that
+// user changing it in between. Only useful inside withTransaction.
+// FOR NO KEY UPDATE is the lock an ordinary UPDATE takes: a second locker waits, but an
+// INSERT of a row that references the user, such as a new bookmark, does not.
+export async function lockUser(db: Queryable, userId: number): Promise<boolean> {
+  const result = await db.query('SELECT 1 FROM app_user WHERE userid = $1 FOR NO KEY UPDATE', [
+    userId,
+  ]);
+  return result.rows.length > 0;
+}
+
 // No database function returns the password hash (get_user leaves it out on purpose),
 // so login reads it here, in the one place that needs it.
 export async function findCredentialsByUsername(

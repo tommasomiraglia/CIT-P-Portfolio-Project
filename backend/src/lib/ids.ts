@@ -13,3 +13,16 @@ export function parseIntegerId(name: string, value: string): number {
   }
   return id;
 }
+
+// IMDB title ids: "tt" followed by 7 or 8 digits, for example tt0052520.
+// Rejecting anything else early gives the client a clear 400 instead of a misleading 404.
+const TITLE_ID = /^tt\d{7,8}$/;
+
+export function parseTitleId(value: string): string {
+  if (!TITLE_ID.test(value)) {
+    throw new BadRequestError(
+      `Invalid title id "${value}": expected "tt" followed by 7 or 8 digits`,
+    );
+  }
+  return value;
+}

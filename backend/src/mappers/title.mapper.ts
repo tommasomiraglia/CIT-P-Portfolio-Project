@@ -7,9 +7,13 @@ function textOrNull(value: string | null): string | null {
   return value === null || value === '' || value === 'N/A' ? null : value;
 }
 
+export function titleUrl(tconst: string): string {
+  return `/api/titles/${tconst}`;
+}
+
 export function toTitleDto(row: TitleRow): TitleDto {
   return {
-    url: `/api/titles/${row.tconst}`,
+    url: titleUrl(row.tconst),
     id: row.tconst,
     title: row.primarytitle,
     type: row.titletype,
@@ -24,7 +28,7 @@ export function toTitleDto(row: TitleRow): TitleDto {
 
 export function toTitleSummaryDto(row: TitleSearchRow): TitleSummaryDto {
   return {
-    url: `/api/titles/${row.tconst}`,
+    url: titleUrl(row.tconst),
     id: row.tconst,
     title: row.primarytitle,
   };
