@@ -1,8 +1,20 @@
 // HTTP handlers for /api/users: validate the request, call the service, send the JSON.
 import type { Request, Response } from 'express';
 import { parseIntegerId } from '../lib/ids.js';
+import { buildPage, parsePageRequest } from '../lib/paging.js';
 import { readJsonObject, requireString } from '../lib/request-body.js';
 import { BadRequestError } from '../middleware/errors.js';
+import {
+  addOwnGenrePreference,
+  getOwnGenrePreference,
+  getOwnGenrePreferences,
+  removeOwnGenrePreference,
+} from '../services/genre.service.js';
+import {
+  getSearchHistory,
+  removeAllSearchHistory,
+  removeSearchHistoryEntry,
+} from '../services/search-history.service.js';
 import { getOwnUser, registerUser } from '../services/user.service.js';
 import type { RegistrationInput } from '../types/user.js';
 
@@ -55,4 +67,83 @@ export async function createUser(req: Request, res: Response): Promise<void> {
 // valid and belongs to the caller.
 export async function getUserById(req: Request<{ userId: string }>, res: Response): Promise<void> {
   res.json(await getOwnUser(parseIntegerId('user id', req.params.userId)));
+}
+
+const POSITIVE_BIGINT = /^[1-9]\d*$/;
+const MAX_POSTGRES_BIGINT = 9_223_372_036_854_775_807n;
+
+function parseHistoryEntryId(value: string): string {
+  if (value.length > 19 || !POSITIVE_BIGINT.test(value) || BigInt(value) > MAX_POSTGRES_BIGINT) {
+    throw new BadRequestError(
+      `Invalid search history entry id "${value}": expected a positive integer`,
+    );
+  }
+  return value;
+}
+
+export async function listSearchHistory(
+  req: Request<{ userId: string }>,
+  res: Response,
+): Promise<void> {
+  const userId = parseIntegerId('user id', req.params.userId);
+  const pageRequest = parsePageRequest(req.query);
+  const slice = await getSearchHistory(userId, pageRequest);
+  res.json(buildPage(slice, pageRequest, req.originalUrl));
+}
+
+export async function deleteSearchHistoryEntry(
+  req: Request<{ userId: string; entryId: string }>,
+  res: Response,
+): Promise<void> {
+  await removeSearchHistoryEntry(
+    parseIntegerId('user id', req.params.userId),
+    parseHistoryEntryId(req.params.entryId),
+  );
+  res.status(204).end();
+}
+
+export async function deleteSearchHistory(
+  req: Request<{ userId: string }>,
+  res: Response,
+): Promise<void> {
+  await removeAllSearchHistory(parseIntegerId('user id', req.params.userId));
+  res.status(204).end();
+}
+
+export async function listOwnGenres(
+  req: Request<{ userId: string }>,
+  res: Response,
+): Promise<void> {
+  const userId = parseIntegerId('user id', req.params.userId);
+  const pageRequest = parsePageRequest(req.query);
+  const slice = await getOwnGenrePreferences(userId, pageRequest);
+  res.json(buildPage(slice, pageRequest, req.originalUrl));
+}
+
+export async function getOwnGenre(
+  req: Request<{ userId: string; genreId: string }>,
+  res: Response,
+): Promise<void> {
+  const userId = parseIntegerId('user id', req.params.userId);
+  const genreId = parseIntegerId('genre id', req.params.genreId);
+  res.json(await getOwnGenrePreference(userId, genreId));
+}
+
+export async function putOwnGenre(
+  req: Request<{ userId: string; genreId: string }>,
+  res: Response,
+): Promise<void> {
+  const userId = parseIntegerId('user id', req.params.userId);
+  const genreId = parseIntegerId('genre id', req.params.genreId);
+  res.json(await addOwnGenrePreference(userId, genreId));
+}
+
+export async function deleteOwnGenre(
+  req: Request<{ userId: string; genreId: string }>,
+  res: Response,
+): Promise<void> {
+  const userId = parseIntegerId('user id', req.params.userId);
+  const genreId = parseIntegerId('genre id', req.params.genreId);
+  await removeOwnGenrePreference(userId, genreId);
+  res.status(204).end();
 }

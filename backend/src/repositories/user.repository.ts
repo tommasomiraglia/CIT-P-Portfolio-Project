@@ -65,6 +65,11 @@ export async function findUserById(db: Queryable, userId: number): Promise<UserR
   return result.rows[0];
 }
 
+export async function userExists(db: Queryable, userId: number): Promise<boolean> {
+  const result = await db.query('SELECT 1 FROM app_user WHERE userid = $1', [userId]);
+  return result.rowCount === 1;
+}
+
 // No database function returns the password hash (get_user leaves it out on purpose),
 // so login reads it here, in the one place that needs it.
 export async function findCredentialsByUsername(

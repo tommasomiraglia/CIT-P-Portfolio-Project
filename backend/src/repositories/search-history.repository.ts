@@ -1,6 +1,12 @@
 // Database access for a user's search history.
 import type { Queryable } from '../db/transaction.js';
 
+export interface SearchHistoryRow {
+  historyid: string;
+  time: Date;
+  value: string;
+}
+
 // Thrown when the user id no longer exists: a user deleted after logging in still has a
 // valid token (docs/api-design.md 4.3). The service turns it into a 401.
 export class UnknownUserError extends Error {
@@ -28,4 +34,33 @@ export async function addSearchHistory(
   } catch (error) {
     throw isForeignKeyViolation(error) ? new UnknownUserError() : error;
   }
+}
+
+export async function listSearchHistory(
+  db: Queryable,
+  userId: number,
+  limit: number,
+  offset: number,
+): Promise<SearchHistoryRow[]> {
+  const result = await db.query<SearchHistoryRow>(
+    'SELECT historyid, "time", value FROM get_search_history($1, $2, $3)',
+    [userId, limit, offset],
+  );
+  return result.rows;
+}
+
+export async function deleteSearchHistoryEntry(
+  db: Queryable,
+  userId: number,
+  historyId: string,
+): Promise<boolean> {
+  const result = await db.query<{ deleted: boolean }>(
+    'SELECT delete_search_history_entry($1, $2::BIGINT) AS deleted',
+    [userId, historyId],
+  );
+  return result.rows[0]?.deleted ?? false;
+}
+
+export async function clearSearchHistory(db: Queryable, userId: number): Promise<void> {
+  await db.query('SELECT clear_search_history($1)', [userId]);
 }
