@@ -3,9 +3,9 @@
 import { pool } from '../db/pool.js';
 import { takePage } from '../lib/paging.js';
 import { toTitleDto, toTitleSummaryDto } from '../mappers/title.mapper.js';
-import { NotFoundError, UnauthorizedError } from '../middleware/errors.js';
-import { addSearchHistory, UnknownUserError } from '../repositories/search-history.repository.js';
+import { NotFoundError } from '../middleware/errors.js';
 import { findTitleById, searchTitlesByText } from '../repositories/title.repository.js';
+import { saveSearch } from './search.history.service.js';
 import type { PageRequest, PageSlice } from '../types/page.js';
 import type { TitleDto, TitleSummaryDto } from '../types/title.js';
 
@@ -34,13 +34,3 @@ export async function searchTitles(
   return takePage(rows, pageRequest, toTitleSummaryDto);
 }
 
-async function saveSearch(userId: number, query: string): Promise<void> {
-  try {
-    await addSearchHistory(pool, userId, query);
-  } catch (error) {
-    if (error instanceof UnknownUserError) {
-      throw new UnauthorizedError('User no longer exists');
-    }
-    throw error;
-  }
-}

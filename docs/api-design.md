@@ -95,6 +95,13 @@ Errors: `400` invalid parameter or body, `401` missing or invalid token, `403` t
   Only the request for page 1 is saved: following `next` is still the same search.
 - A token that is sent but invalid is a `401`, also here (4.4).
 
+### 1.8 People search: `GET /api/people?name=`
+
+- `name` is required, trimmed, and 1 to 200 characters, anything else is a `400`.
+- It matches people whose primary name contains the text, ignoring case.
+- History and tokens work as in the title search (1.7): a logged-in search is saved
+  for page 1 only, and a token that is sent but invalid is a `401`.
+
 ## 2. JSON representations
 
 ### 2.1 Plain JSON with `url` fields
@@ -136,6 +143,16 @@ Every error has the same shape, with the matching HTTP status (2-B.2, 2-D.5):
 Messages never contain SQL, table names or stack traces (2-A.4).
 
 ### 2.6 Representations
+
+**Person in a list** (the items of `GET /api/people?name=`):
+
+| Field | Type | Meaning |
+| --- | --- | --- |
+| `url` | string | URI of the person, `/api/people/:id` |
+| `id` | string | IMDB id, for example `nm0000136` |
+| `name` | string | Primary name |
+
+The client follows `url` for the full person.
 
 **Title in a list** (the items of `GET /api/titles?search=`):
 
