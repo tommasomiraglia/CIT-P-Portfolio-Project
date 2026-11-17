@@ -5,9 +5,9 @@ import { takePage } from '../lib/paging.js';
 import { toTitleDto, toTitleSummaryDto } from '../mappers/title.mapper.js';
 import { NotFoundError } from '../middleware/errors.js';
 import { findTitleById, searchTitlesByText } from '../repositories/title.repository.js';
-import { saveSearch } from './search.history.service.js';
 import type { PageRequest, PageSlice } from '../types/page.js';
 import type { TitleDto, TitleSummaryDto } from '../types/title.js';
+import { saveSearch } from './search.history.service.js';
 
 export async function getTitle(tconst: string): Promise<TitleDto> {
   const row = await findTitleById(tconst);
@@ -33,4 +33,3 @@ export async function searchTitles(
   const rows = await searchTitlesByText(pool, query, pageRequest);
   return takePage(rows, pageRequest, toTitleSummaryDto);
 }
-
