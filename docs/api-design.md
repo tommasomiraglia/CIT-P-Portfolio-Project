@@ -102,6 +102,16 @@ Errors: `400` invalid parameter or body, `401` missing or invalid token, `403` t
 - History and tokens work as in the title search (1.7): a logged-in search is saved
   for page 1 only, and a token that is sent but invalid is a `401`.
 
+
+### 1.9 A person and its sub-resources: `GET /api/people/:id`, `/co-players`, `/words`
+
+- `:id` must be `nm` followed by 7 or 8 digits; anything else is a `400`, before the database is asked.
+- A person that does not exist is a `404`, also for `/co-players` and `/words`.
+  Only then can a client tell "no such person" from "this person has no co-players", which is an empty page.
+- `/co-players` lists the people who acted with the person in the most titles, counting actor and actress roles only.
+  `/words` lists the most frequent words in the person's titles.
+  Both are paged (section 3) and ordered by their count, highest first, then alphabetically.
+
 ## 2. JSON representations
 
 ### 2.1 Plain JSON with `url` fields
@@ -163,6 +173,35 @@ The client follows `url` for the full person.
 | `title` | string | Primary title |
 
 The client follows `url` for the full title.
+
+**Person** (`GET /api/people/:id`):
+
+| Field | Type | Meaning |
+| --- | --- | --- |
+| `url` | string | URI of the person, `/api/people/:id` |
+| `id` | string | IMDB id, for example `nm0000136` |
+| `name` | string | Primary name |
+| `birthYear` | integer or null | |
+| `deathYear` | integer or null | `null` while the person is alive or when unknown |
+| `professions` | string[] | Primary professions, sorted by name |
+| `rating` | number or null | Weighted average rating of the person's titles, `null` when none is rated |
+| `knownFor` | `{ url, title }[]` | Titles the person is known for, sorted by title. Embedded: IMDB lists at most four (2.4) |
+| `coPlayersUrl` | string | `/api/people/:id/co-players` |
+| `wordsUrl` | string | `/api/people/:id/words` |
+
+**Co-player in a list** (the items of `GET /api/people/:id/co-players`):
+the fields of a person in a list, plus `sharedTitles` (integer), the number of titles the two acted in together.
+
+**Word in a list** (the items of `GET /api/people/:id/words`):
+
+| Field | Type | Meaning |
+| --- | --- | --- |
+| `url` | string | Title search for the word, `/api/titles?words=<word>&match=any` |
+| `word` | string | A word from the person's titles |
+| `frequency` | integer | How often the word occurs |
+
+A word is not a resource of its own, so its `url` leads to the titles that contain it.
+That link works once the word search of 1.5 is implemented.
 
 **User**: see 4.5.
 
