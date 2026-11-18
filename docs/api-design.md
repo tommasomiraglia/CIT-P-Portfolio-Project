@@ -48,8 +48,8 @@ Ids are validated before use (2-D.2): titles match `tt` plus 7 or 8 digits, peop
 | `GET /api/titles?title=…&plot=…&characters=…&names=…` | `structured_string_search` | Optional, as above |
 | `GET /api/titles?words=a,b&match=exact\|any\|ranked` | `exact_match_search`, `any_match_search`, `weights_search` | None |
 | `GET /api/titles/:id` | - | None |
-| `GET /api/genres` | `generes` | None |
-| `GET /api/genres/:genreId` | `generes` | None |
+| `GET /api/genres` | - (reads the `generes` table) | None |
+| `GET /api/genres/:genreId` | - (reads the `generes` table) | None |
 | `GET /api/titles/:id/similar` | `similarity_search` | None |
 | `GET /api/titles/:id/actors` | `popular_actors_in_movie` | None |
 | `GET /api/people?name=…` | `search_names` | Optional, as above |
@@ -70,7 +70,7 @@ Ids are validated before use (2-D.2): titles match `tt` plus 7 or 8 digits, peop
 | `GET`, `DELETE /api/users/:userId/search-history` | `get_search_history`, `clear_search_history` | Same user |
 | `DELETE /api/users/:userId/search-history/:entryId` | `delete_search_history_entry` | Same user |
 | `GET /api/users/:userId/genres` | `get_genre_preferences` | Same user |
-| `GET /api/users/:userId/genres/:genreId` | `get_genre_preferences` | Same user |
+| `GET /api/users/:userId/genres/:genreId` | - | Same user |
 | `PUT`, `DELETE /api/users/:userId/genres/:genreId` | `add_genre_preference`, `remove_genre_preference` | Same user |
 
 Combining `search`, the structured parameters and `words` in one request is a `400`.
@@ -106,7 +106,6 @@ Errors: `400` invalid parameter or body, `401` missing or invalid token, `403` t
 - History and tokens work as in the title search (1.7): a logged-in search is saved
   for page 1 only, and a token that is sent but invalid is a `401`.
 
-
 ### 1.9 A person and its sub-resources: `GET /api/people/:id`, `/co-players`, `/words`
 
 - `:id` must be `nm` followed by 7 or 8 digits; anything else is a `400`, before the database is asked.
@@ -135,6 +134,26 @@ Other fields are ignored.
 - `GET /api/users/:userId/ratings` is ordered by title, as `get_rating_history` returns it.
 - `GET /api/users/:userId/ratings/:titleId` has no database function: the repository reads the one row itself.
   It exists so that a title page can show the user's own rating without paging through the whole list.
+
+### 1.11 Genres: `/api/genres` and `/api/users/:userId/genres`
+
+- The genre catalogue is IMDB data, so it is read-only (1.4).
+  It is one small table with no database function, so the repository reads it directly, ordered by name.
+- A user's favourite genres are framework data: `PUT` adds one, `DELETE` removes one.
+  `PUT` answers `200` with the genre also when it already was a favourite (1.6): `add_genre_preference` ignores the duplicate.
+- An unknown genre is a `404` for `GET /api/genres/:genreId` and for `PUT`.
+  `GET` and `DELETE` of a genre that is not one of the user's favourites are a `404` too.
+- The favourite endpoints answer with the genre itself, so its `url` is `/api/genres/:genreId`.
+- `GET /api/users/:userId/genres/:genreId` has no database function: the repository reads the one row itself, as for ratings (1.10).
+
+### 1.12 Search history: `/api/users/:userId/search-history`
+
+- Entries are only created by a logged-in search (1.7, 1.8); the API offers no `POST`.
+- The list is ordered newest first.
+- `:entryId` is a positive integer that fits a PostgreSQL `BIGINT`, anything else is a `400`.
+  The `id` field is a string, because a `BIGINT` can be larger than a JavaScript number holds exactly.
+- Deleting an entry the user does not have is a `404`, also when it belongs to another user.
+- Deleting the whole history answers `204` also when it was already empty.
 
 ## 2. JSON representations
 

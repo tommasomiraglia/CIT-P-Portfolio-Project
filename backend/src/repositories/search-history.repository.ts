@@ -1,11 +1,9 @@
-// Database access for a user's search history.
+// Database access for a user's search history. Returns raw rows; mapping them to API
+// objects is the mapper's job.
 import type { Queryable } from '../db/transaction.js';
-
-export interface SearchHistoryRow {
-  historyid: string;
-  time: Date;
-  value: string;
-}
+import { toLimitOffset } from '../lib/paging.js';
+import type { PageRequest } from '../types/page.js';
+import type { SearchHistoryRow } from '../types/search-history.js';
 
 // Thrown when the user id no longer exists: a user deleted after logging in still has a
 // valid token (docs/api-design.md 4.3). The service turns it into a 401.
@@ -36,12 +34,14 @@ export async function addSearchHistory(
   }
 }
 
+// One page of the user's searches, newest first. Fetches one row more than the page holds,
+// so the service can tell whether there is a next page (docs/api-design.md 3.3).
 export async function listSearchHistory(
   db: Queryable,
   userId: number,
-  limit: number,
-  offset: number,
+  pageRequest: PageRequest,
 ): Promise<SearchHistoryRow[]> {
+  const { limit, offset } = toLimitOffset(pageRequest);
   const result = await db.query<SearchHistoryRow>(
     'SELECT historyid, "time", value FROM get_search_history($1, $2, $3)',
     [userId, limit, offset],
@@ -49,6 +49,8 @@ export async function listSearchHistory(
   return result.rows;
 }
 
+// Returns false when the user has no entry with this id, also when it is another user's.
+// historyId is a string because the column is a BIGINT (see SearchHistoryRow).
 export async function deleteSearchHistoryEntry(
   db: Queryable,
   userId: number,

@@ -1,6 +1,7 @@
 // Business rules for a user's search history.
 import { pool } from '../db/pool.js';
-import { takePage, toLimitOffset } from '../lib/paging.js';
+import { takePage } from '../lib/paging.js';
+import { toSearchHistoryDto } from '../mappers/search-history.mapper.js';
 import { NotFoundError, UnauthorizedError } from '../middleware/errors.js';
 import {
   addSearchHistory,
@@ -12,18 +13,6 @@ import {
 import { userExists } from '../repositories/user.repository.js';
 import type { PageRequest, PageSlice } from '../types/page.js';
 import type { SearchHistoryDto } from '../types/search-history.js';
-
-function toSearchHistoryDto(
-  userId: number,
-  row: { historyid: string; time: Date; value: string },
-): SearchHistoryDto {
-  return {
-    url: `/api/users/${userId}/search-history/${row.historyid}`,
-    id: row.historyid,
-    searchText: row.value,
-    time: row.time.toISOString(),
-  };
-}
 
 // Records one search of a logged-in user. The title and person searches call it.
 export async function saveSearch(userId: number, query: string): Promise<void> {
@@ -42,8 +31,7 @@ export async function getSearchHistory(
   pageRequest: PageRequest,
 ): Promise<PageSlice<SearchHistoryDto>> {
   await ensureUserExists(userId);
-  const { limit, offset } = toLimitOffset(pageRequest);
-  const rows = await listSearchHistory(pool, userId, limit, offset);
+  const rows = await listSearchHistory(pool, userId, pageRequest);
   return takePage(rows, pageRequest, (row) => toSearchHistoryDto(userId, row));
 }
 
@@ -59,6 +47,7 @@ export async function removeAllSearchHistory(userId: number): Promise<void> {
   await clearSearchHistory(pool, userId);
 }
 
+// A user deleted after logging in still has a valid token (docs/api-design.md 4.3).
 async function ensureUserExists(userId: number): Promise<void> {
   if (!(await userExists(pool, userId))) {
     throw new UnauthorizedError('User no longer exists');

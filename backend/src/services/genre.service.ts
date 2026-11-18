@@ -1,11 +1,12 @@
 // Business rules for the genre catalogue and a user's favourite genres.
 import { pool } from '../db/pool.js';
-import { takePage, toLimitOffset } from '../lib/paging.js';
+import { takePage } from '../lib/paging.js';
+import { toGenreDto } from '../mappers/genre.mapper.js';
 import { NotFoundError, UnauthorizedError } from '../middleware/errors.js';
 import {
   addGenrePreference,
-  getGenre,
-  getGenrePreference,
+  findGenreById,
+  findGenrePreference,
   listGenrePreferences,
   listGenres,
   removeGenrePreference,
@@ -14,22 +15,13 @@ import { userExists } from '../repositories/user.repository.js';
 import type { GenreDto } from '../types/genre.js';
 import type { PageRequest, PageSlice } from '../types/page.js';
 
-function toGenreDto(row: { genereid: number; name: string }): GenreDto {
-  return {
-    url: `/api/genres/${row.genereid}`,
-    id: row.genereid,
-    name: row.name,
-  };
-}
-
 export async function getGenres(pageRequest: PageRequest): Promise<PageSlice<GenreDto>> {
-  const { limit, offset } = toLimitOffset(pageRequest);
-  const rows = await listGenres(pool, limit, offset);
+  const rows = await listGenres(pool, pageRequest);
   return takePage(rows, pageRequest, toGenreDto);
 }
 
 export async function getGenreById(genreId: number): Promise<GenreDto> {
-  const row = await getGenre(pool, genreId);
+  const row = await findGenreById(pool, genreId);
   if (!row) {
     throw new NotFoundError(`Genre ${genreId} not found`);
   }
@@ -41,36 +33,40 @@ export async function getOwnGenrePreferences(
   pageRequest: PageRequest,
 ): Promise<PageSlice<GenreDto>> {
   await ensureUserExists(userId);
-  const { limit, offset } = toLimitOffset(pageRequest);
-  const rows = await listGenrePreferences(pool, userId, limit, offset);
+  const rows = await listGenrePreferences(pool, userId, pageRequest);
   return takePage(rows, pageRequest, toGenreDto);
 }
 
 export async function getOwnGenrePreference(userId: number, genreId: number): Promise<GenreDto> {
   await ensureUserExists(userId);
-  const row = await getGenrePreference(pool, userId, genreId);
+  const row = await findGenrePreference(pool, userId, genreId);
   if (!row) {
-    throw new NotFoundError(`Genre preference ${genreId} not found`);
+    throw new NotFoundError(`Genre ${genreId} is not one of your favourite genres`);
   }
   return toGenreDto(row);
 }
 
+// PUT: 200 with the genre, also when it already was a favourite (docs/api-design.md 1.6).
+// The genre is checked first: genres never change, and add_genre_preference itself would
+// only fail with a foreign key error, which says nothing clear.
 export async function addOwnGenrePreference(userId: number, genreId: number): Promise<GenreDto> {
   await ensureUserExists(userId);
-  const row = await addGenrePreference(pool, userId, genreId);
-  if (!row) {
+  const genre = await findGenreById(pool, genreId);
+  if (!genre) {
     throw new NotFoundError(`Genre ${genreId} not found`);
   }
-  return toGenreDto(row);
+  await addGenrePreference(pool, userId, genreId);
+  return toGenreDto(genre);
 }
 
 export async function removeOwnGenrePreference(userId: number, genreId: number): Promise<void> {
   await ensureUserExists(userId);
   if (!(await removeGenrePreference(pool, userId, genreId))) {
-    throw new NotFoundError(`Genre preference ${genreId} not found`);
+    throw new NotFoundError(`Genre ${genreId} is not one of your favourite genres`);
   }
 }
 
+// A user deleted after logging in still has a valid token (docs/api-design.md 4.3).
 async function ensureUserExists(userId: number): Promise<void> {
   if (!(await userExists(pool, userId))) {
     throw new UnauthorizedError('User no longer exists');
