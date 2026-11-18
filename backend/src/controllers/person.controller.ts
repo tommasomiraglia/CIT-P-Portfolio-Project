@@ -17,6 +17,7 @@ const MAX_SEARCH_LENGTH = 200;
 // Rejecting anything else early gives the client a clear 400 instead of a misleading 404.
 const PERSON_ID_PATTERN = /^nm\d{7,8}$/;
 
+// The :id of every /api/people/:id route.
 function parsePersonId(id: string): string {
   if (!PERSON_ID_PATTERN.test(id)) {
     throw new BadRequestError(`Invalid person id "${id}": expected "nm" followed by 7 or 8 digits`);
@@ -24,13 +25,13 @@ function parsePersonId(id: string): string {
   return id;
 }
 
+// GET /api/people/:id
 export async function getPersonById(req: Request<{ id: string }>, res: Response): Promise<void> {
   const id = parsePersonId(req.params.id);
   res.json(await getPerson(id));
 }
 
-// The :id of every /api/people/:id route: "nm" followed by 7 or 8 digits, otherwise error 400.
-
+// GET /api/people?name=... (docs/api-design.md 1.8).
 function parseName(query: Readonly<Record<string, unknown>>): string {
   const value = query.name;
   if (value === undefined) {
@@ -61,7 +62,6 @@ export async function listCoPlayers(req: Request<{ id: string }>, res: Response)
   res.json(buildPage(slice, pageRequest, req.originalUrl));
 }
 
-// новый: добавь под listCoPlayers
 // GET /api/people/:id/words
 export async function listPersonWords(req: Request<{ id: string }>, res: Response): Promise<void> {
   const id = parsePersonId(req.params.id);

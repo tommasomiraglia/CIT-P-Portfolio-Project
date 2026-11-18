@@ -44,6 +44,8 @@ export interface PersonDto {
   professions: string[];
   rating: number | null;
   knownFor: KnownForTitleDto[];
+  coPlayersUrl: string;
+  wordsUrl: string;
 }
 
 export interface CoPlayerRow {

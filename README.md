@@ -143,6 +143,12 @@ Files ending in `.api.test.ts`, and `api.test.ts`, send real HTTP requests to th
 | `GET /api/health` | `200 {"status":"ok"}`, or `503` if the database does not answer |
 | `GET /api/titles/:id` | `200` with the title, `400` if `:id` is not a title id like `tt0052520`, `404` if no title has that id |
 | `GET /api/titles?search=…` | `200` with one page of matching titles (`page`, `pageSize`), `400` for a missing or invalid parameter; saved to the history when a token is sent |
+| `GET /api/people?name=…` | `200` with one page of people whose name contains the text, `400` for a missing or invalid parameter; saved to the history when a token is sent |
+| `GET /api/people/:id` | `200` with the person, `400` if `:id` is not a person id like `nm0000138`, `404` if no person has that id |
+| `GET /api/people/:id/co-players` | `200` with one page of the people who acted with them most often, `400` or `404` as above |
+| `GET /api/people/:id/words` | `200` with one page of the most frequent words in their titles, `400` or `404` as above |
+| `GET /api/genres` | `200` with one page of genres |
+| `GET /api/genres/:genreId` | `200` with the genre, `400` if `:genreId` is not a positive integer, `404` if no genre has that id |
 | `POST /api/users` | Registers a user: `201` with the user and a `Location` header, `400` for an invalid field, `409` if the username or email is taken |
 | `POST /api/auth/login` | `200` with a token and the user, `401` for a wrong username or password |
 | `GET /api/users/:userId` | Needs `Authorization: Bearer <token>` for that same user: `200` with the user, `401` without a valid token, `403` for another user |
@@ -150,6 +156,13 @@ Files ending in `.api.test.ts`, and `api.test.ts`, send real HTTP requests to th
 | `GET /api/users/:userId/ratings/:titleId` | Same token rules. `200` with the user's rating of that title, `404` if they have not rated it |
 | `PUT /api/users/:userId/ratings/:titleId` | Same token rules. Body `{ "rating": 1-10, "comment": "..." }`: `200` with the rating, `400` for an invalid rating or comment, `404` if no title has that id |
 | `DELETE /api/users/:userId/ratings/:titleId` | Same token rules. `204`, or `404` if there was no rating |
+| `GET /api/users/:userId/search-history` | Same token rules. `200` with one page of the user's searches, newest first |
+| `DELETE /api/users/:userId/search-history` | Same token rules. `204`, also when there was nothing to remove |
+| `DELETE /api/users/:userId/search-history/:entryId` | Same token rules. `204`, `400` if `:entryId` is not a positive integer, `404` if the user has no such entry |
+| `GET /api/users/:userId/genres` | Same token rules. `200` with one page of the user's favourite genres |
+| `GET /api/users/:userId/genres/:genreId` | Same token rules. `200` with the genre, `404` if it is not one of their favourites |
+| `PUT /api/users/:userId/genres/:genreId` | Same token rules. `200` with the genre, also when it already was a favourite, `404` if no genre has that id |
+| `DELETE /api/users/:userId/genres/:genreId` | Same token rules. `204`, or `404` if it was not one of their favourites |
 
 Example:
 

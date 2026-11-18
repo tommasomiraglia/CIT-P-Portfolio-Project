@@ -68,6 +68,8 @@ describe('toPersonDto', () => {
       professions: ['actor', 'director'],
       rating: 8,
       knownFor: [{ url: '/api/titles/tt0325980', title: 'Pirates of the Caribbean' }],
+      coPlayersUrl: '/api/people/nm0000136/co-players',
+      wordsUrl: '/api/people/nm0000136/words',
     });
   });
 

@@ -49,13 +49,16 @@ export function toPersonWordDto(row: PersonWordRow): PersonWordDto {
 }
 
 // Builds the person detail from the three query results (person, professions, known-for titles).
+// Co-players and words can be long lists, so they are linked, not embedded
+// (docs/api-design.md 2.4).
 export function toPersonDto(
   person: PersonRow,
   professions: PersonProfessionRow[],
   knownFor: PersonKnownForRow[],
 ): PersonDto {
+  const url = `/api/people/${person.nconst}`;
   return {
-    url: `/api/people/${person.nconst}`,
+    url,
     id: person.nconst,
     name: person.primaryname,
     birthYear: person.birthyear,
@@ -63,5 +66,7 @@ export function toPersonDto(
     professions: professions.map((row) => row.name),
     rating: person.rating,
     knownFor: knownFor.map(toKnownForTitleDto),
+    coPlayersUrl: `${url}/co-players`,
+    wordsUrl: `${url}/words`,
   };
 }
