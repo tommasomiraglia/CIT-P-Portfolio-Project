@@ -48,6 +48,8 @@ Ids are validated before use (2-D.2): titles match `tt` plus 7 or 8 digits, peop
 | `GET /api/titles?title=…&plot=…&characters=…&names=…` | `structured_string_search` | Optional, as above |
 | `GET /api/titles?words=a,b&match=exact\|any\|ranked` | `exact_match_search`, `any_match_search`, `weights_search` | None |
 | `GET /api/titles/:id` | - | None |
+| `GET /api/genres` | `generes` | None |
+| `GET /api/genres/:genreId` | `generes` | None |
 | `GET /api/titles/:id/similar` | `similarity_search` | None |
 | `GET /api/titles/:id/actors` | `popular_actors_in_movie` | None |
 | `GET /api/people?name=…` | `search_names` | Optional, as above |
@@ -67,6 +69,7 @@ Ids are validated before use (2-D.2): titles match `tt` plus 7 or 8 digits, peop
 | `GET`, `DELETE /api/users/:userId/search-history` | `get_search_history`, `clear_search_history` | Same user |
 | `DELETE /api/users/:userId/search-history/:entryId` | `delete_search_history_entry` | Same user |
 | `GET /api/users/:userId/genres` | `get_genre_preferences` | Same user |
+| `GET /api/users/:userId/genres/:genreId` | `get_genre_preferences` | Same user |
 | `PUT`, `DELETE /api/users/:userId/genres/:genreId` | `add_genre_preference`, `remove_genre_preference` | Same user |
 
 Combining `search`, the structured parameters and `words` in one request is a `400`.
@@ -173,6 +176,23 @@ The client follows `url` for the full person.
 | `title` | string | Primary title |
 
 The client follows `url` for the full title.
+
+**Genre** (the items of `GET /api/genres` and genre preference endpoints):
+
+| Field | Type | Meaning |
+| --- | --- | --- |
+| `url` | string | URI of the genre, `/api/genres/:genreId` |
+| `id` | number | Genre id |
+| `name` | string | Genre name |
+
+**Search history entry** (the items of `GET /api/users/:userId/search-history`):
+
+| Field | Type | Meaning |
+| --- | --- | --- |
+| `url` | string | URI of the entry, `/api/users/:userId/search-history/:entryId` |
+| `id` | string | History entry id |
+| `searchText` | string | Text that was searched |
+| `time` | string | Search time in ISO 8601 UTC |
 
 **Person** (`GET /api/people/:id`):
 
