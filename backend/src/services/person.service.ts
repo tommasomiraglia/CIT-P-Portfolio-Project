@@ -19,7 +19,7 @@ import {
 } from '../repositories/person.repository.js';
 import type { PageRequest, PageSlice } from '../types/page.js';
 import type { CoPlayerDto, PersonDto, PersonSummaryDto, PersonWordDto } from '../types/person.js';
-import { saveSearch } from './search.history.service.js';
+import { saveSearch } from './search-history.service.js';
 
 // One person with professions and known-for titles. An unknown id is a 404 error
 export async function getPerson(nconst: string): Promise<PersonDto> {
