@@ -65,6 +65,11 @@ export async function findUserById(db: Queryable, userId: number): Promise<UserR
   return result.rows[0];
 }
 
+export async function userExists(db: Queryable, userId: number): Promise<boolean> {
+  const result = await db.query('SELECT 1 FROM app_user WHERE userid = $1', [userId]);
+  return result.rowCount === 1;
+}
+
 // Locks the user's row until the surrounding transaction ends, and returns false when the
 // user does not exist. Two transactions that lock the same user run one after the other,
 // so a service can read a user's data and then write it without another request of that

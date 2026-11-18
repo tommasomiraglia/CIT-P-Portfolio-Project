@@ -115,6 +115,54 @@ describe('search history', () => {
     expect(await historyOf(user.id)).toEqual(['Twilight Zone']);
   });
 
+  test('shows logged-in searches newest first with paging and delete operations', async () => {
+    const user = await users.create();
+    const authorization = user.authorization;
+    await search('search=Twilight%20Zone').set('Authorization', authorization);
+    await search('search=The%20Twilight%20Zone').set('Authorization', authorization);
+
+    const firstPage = await request(app)
+      .get(`/api/users/${user.id}/search-history?pageSize=1`)
+      .set('Authorization', authorization);
+    expect(firstPage.status).toBe(200);
+    expect(firstPage.body).toMatchObject({
+      page: 1,
+      pageSize: 1,
+      prev: null,
+      next: expect.stringContaining('page=2'),
+      items: [
+        {
+          url: expect.stringMatching(new RegExp(`^/api/users/${user.id}/search-history/\\d+$`)),
+          id: expect.any(String),
+          searchText: 'The Twilight Zone',
+          time: expect.stringMatching(/^\d{4}-\d\d-\d\dT.*Z$/),
+        },
+      ],
+    });
+
+    const secondPage = await request(app)
+      .get(firstPage.body.next)
+      .set('Authorization', authorization);
+    expect(secondPage.body.items[0].searchText).toBe('Twilight Zone');
+
+    const entryUrl: string = firstPage.body.items[0].url;
+    expect((await request(app).delete(entryUrl).set('Authorization', authorization)).status).toBe(
+      204,
+    );
+    expect((await request(app).delete(entryUrl).set('Authorization', authorization)).status).toBe(
+      404,
+    );
+
+    const clear = await request(app)
+      .delete(`/api/users/${user.id}/search-history`)
+      .set('Authorization', authorization);
+    expect(clear.status).toBe(204);
+    const empty = await request(app)
+      .get(`/api/users/${user.id}/search-history`)
+      .set('Authorization', authorization);
+    expect(empty.body.items).toEqual([]);
+  });
+
   test('saves nothing for an anonymous search', async () => {
     const marker = `nothing-matches-${users.prefix}`;
     await search(`search=${marker}`);
@@ -136,5 +184,53 @@ describe('search history', () => {
     const res = await search('search=star').set('Authorization', user.authorization);
     expect(res.status).toBe(401);
     expect(res.body).toEqual({ error: { message: 'User no longer exists' } });
+  });
+});
+
+describe('genres and genre preferences', () => {
+  test('lists genres and manages an idempotent own preference', async () => {
+    const user = await users.create();
+    const genres = await request(app).get('/api/genres?pageSize=1');
+    expect(genres.status).toBe(200);
+    expect(genres.body).toMatchObject({
+      page: 1,
+      pageSize: 1,
+      items: [{ url: expect.stringMatching(/^\/api\/genres\/\d+$/), id: expect.any(Number) }],
+    });
+    const genre = genres.body.items[0] as { id: number; name: string; url: string };
+    expect((await request(app).get(genre.url)).body).toEqual(genre);
+
+    const putUrl = `/api/users/${user.id}/genres/${genre.id}`;
+    const added = await request(app).put(putUrl).set('Authorization', user.authorization);
+    expect(added.status).toBe(200);
+    expect(added.body).toEqual({ url: genre.url, id: genre.id, name: genre.name });
+    expect((await request(app).put(putUrl).set('Authorization', user.authorization)).status).toBe(
+      200,
+    );
+
+    const selected = await request(app).get(putUrl).set('Authorization', user.authorization);
+    expect(selected.body).toEqual(added.body);
+    const preferences = await request(app)
+      .get(`/api/users/${user.id}/genres`)
+      .set('Authorization', user.authorization);
+    expect(preferences.body.items).toContainEqual(added.body);
+
+    expect(
+      (await request(app).delete(putUrl).set('Authorization', user.authorization)).status,
+    ).toBe(204);
+    expect(
+      (await request(app).delete(putUrl).set('Authorization', user.authorization)).status,
+    ).toBe(404);
+    expect((await request(app).get(putUrl).set('Authorization', user.authorization)).status).toBe(
+      404,
+    );
+  });
+
+  test('answers 404 when adding an unknown genre', async () => {
+    const user = await users.create();
+    const res = await request(app)
+      .put(`/api/users/${user.id}/genres/2147483647`)
+      .set('Authorization', user.authorization);
+    expect(res.status).toBe(404);
   });
 });

@@ -56,7 +56,7 @@ A user can do everything a visitor can.
 | --- | --- | --- | --- |
 | R1 | As a user, I want to rate a title from 1 to 10 and change my mind later, so that my opinion counts in its rating. | `PUT /api/users/:userId/ratings/:titleId` | Built |
 | R2 | As a user, I want to add a comment to my rating, so that I remember why I gave it. | Same `PUT`, with the comment in the body, in one transaction | Built |
-| R3 | As a user, I want to see my own rating on a title page, so that I know whether I already rated it. | **new** `GET /api/users/:userId/ratings/:titleId` | Built (api-design.md 1.8) |
+| R3 | As a user, I want to see my own rating on a title page, so that I know whether I already rated it. | **new** `GET /api/users/:userId/ratings/:titleId` | Built (api-design.md 1.10) |
 | R4 | As a user, I want a list of everything I have rated, so that I can look back at my opinions. | `GET /api/users/:userId/ratings` | Built |
 | R5 | As a user, I want to remove a rating, so that a mistaken rating does not count. | `DELETE /api/users/:userId/ratings/:titleId` | Built |
 

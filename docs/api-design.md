@@ -48,6 +48,8 @@ Ids are validated before use (2-D.2): titles match `tt` plus 7 or 8 digits, peop
 | `GET /api/titles?title=…&plot=…&characters=…&names=…` | `structured_string_search` | Optional, as above |
 | `GET /api/titles?words=a,b&match=exact\|any\|ranked` | `exact_match_search`, `any_match_search`, `weights_search` | None |
 | `GET /api/titles/:id` | - | None |
+| `GET /api/genres` | `generes` | None |
+| `GET /api/genres/:genreId` | `generes` | None |
 | `GET /api/titles/:id/similar` | `similarity_search` | None |
 | `GET /api/titles/:id/actors` | `popular_actors_in_movie` | None |
 | `GET /api/people?name=…` | `search_names` | Optional, as above |
@@ -68,6 +70,7 @@ Ids are validated before use (2-D.2): titles match `tt` plus 7 or 8 digits, peop
 | `GET`, `DELETE /api/users/:userId/search-history` | `get_search_history`, `clear_search_history` | Same user |
 | `DELETE /api/users/:userId/search-history/:entryId` | `delete_search_history_entry` | Same user |
 | `GET /api/users/:userId/genres` | `get_genre_preferences` | Same user |
+| `GET /api/users/:userId/genres/:genreId` | `get_genre_preferences` | Same user |
 | `PUT`, `DELETE /api/users/:userId/genres/:genreId` | `add_genre_preference`, `remove_genre_preference` | Same user |
 
 Combining `search`, the structured parameters and `words` in one request is a `400`.
@@ -96,7 +99,24 @@ Errors: `400` invalid parameter or body, `401` missing or invalid token, `403` t
   Only the request for page 1 is saved: following `next` is still the same search.
 - A token that is sent but invalid is a `401`, also here (4.4).
 
-### 1.8 Ratings: `/api/users/:userId/ratings`
+### 1.8 People search: `GET /api/people?name=`
+
+- `name` is required, trimmed, and 1 to 200 characters, anything else is a `400`.
+- It matches people whose primary name contains the text, ignoring case.
+- History and tokens work as in the title search (1.7): a logged-in search is saved
+  for page 1 only, and a token that is sent but invalid is a `401`.
+
+
+### 1.9 A person and its sub-resources: `GET /api/people/:id`, `/co-players`, `/words`
+
+- `:id` must be `nm` followed by 7 or 8 digits; anything else is a `400`, before the database is asked.
+- A person that does not exist is a `404`, also for `/co-players` and `/words`.
+  Only then can a client tell "no such person" from "this person has no co-players", which is an empty page.
+- `/co-players` lists the people who acted with the person in the most titles, counting actor and actress roles only.
+  `/words` lists the most frequent words in the person's titles.
+  Both are paged (section 3) and ordered by their count, highest first, then alphabetically.
+
+### 1.10 Ratings: `/api/users/:userId/ratings`
 
 `PUT /api/users/:userId/ratings/:titleId` takes a JSON body:
 
@@ -158,6 +178,16 @@ Messages never contain SQL, table names or stack traces (2-A.4).
 
 ### 2.6 Representations
 
+**Person in a list** (the items of `GET /api/people?name=`):
+
+| Field | Type | Meaning |
+| --- | --- | --- |
+| `url` | string | URI of the person, `/api/people/:id` |
+| `id` | string | IMDB id, for example `nm0000136` |
+| `name` | string | Primary name |
+
+The client follows `url` for the full person.
+
 **Title in a list** (the items of `GET /api/titles?search=`):
 
 | Field | Type | Meaning |
@@ -176,6 +206,52 @@ The client follows `url` for the full title.
 | `title` | object | The rated title: `{ "url": "/api/titles/tt0052520", "name": "The Twilight Zone" }` (2.4) |
 | `rating` | number | Whole number from 1 to 10 |
 | `comment` | string or `null` | The user's comment |
+
+**Genre** (the items of `GET /api/genres` and genre preference endpoints):
+
+| Field | Type | Meaning |
+| --- | --- | --- |
+| `url` | string | URI of the genre, `/api/genres/:genreId` |
+| `id` | number | Genre id |
+| `name` | string | Genre name |
+
+**Search history entry** (the items of `GET /api/users/:userId/search-history`):
+
+| Field | Type | Meaning |
+| --- | --- | --- |
+| `url` | string | URI of the entry, `/api/users/:userId/search-history/:entryId` |
+| `id` | string | History entry id |
+| `searchText` | string | Text that was searched |
+| `time` | string | Search time in ISO 8601 UTC |
+
+**Person** (`GET /api/people/:id`):
+
+| Field | Type | Meaning |
+| --- | --- | --- |
+| `url` | string | URI of the person, `/api/people/:id` |
+| `id` | string | IMDB id, for example `nm0000136` |
+| `name` | string | Primary name |
+| `birthYear` | integer or null | |
+| `deathYear` | integer or null | `null` while the person is alive or when unknown |
+| `professions` | string[] | Primary professions, sorted by name |
+| `rating` | number or null | Weighted average rating of the person's titles, `null` when none is rated |
+| `knownFor` | `{ url, title }[]` | Titles the person is known for, sorted by title. Embedded: IMDB lists at most four (2.4) |
+| `coPlayersUrl` | string | `/api/people/:id/co-players` |
+| `wordsUrl` | string | `/api/people/:id/words` |
+
+**Co-player in a list** (the items of `GET /api/people/:id/co-players`):
+the fields of a person in a list, plus `sharedTitles` (integer), the number of titles the two acted in together.
+
+**Word in a list** (the items of `GET /api/people/:id/words`):
+
+| Field | Type | Meaning |
+| --- | --- | --- |
+| `url` | string | Title search for the word, `/api/titles?words=<word>&match=any` |
+| `word` | string | A word from the person's titles |
+| `frequency` | integer | How often the word occurs |
+
+A word is not a resource of its own, so its `url` leads to the titles that contain it.
+That link works once the word search of 1.5 is implemented.
 
 **User**: see 4.5.
 
