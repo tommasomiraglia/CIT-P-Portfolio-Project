@@ -1,6 +1,6 @@
 // Routes for the title resource. Mounted at /api/titles in routes/index.ts.
 import { Router } from 'express';
-import { getTitleById, listTitles, listSimilarTitles } from '../controllers/title.controller.js';
+import { getTitleById, listTitles, listSimilarTitles, listPopularActors } from '../controllers/title.controller.js';
 import { authenticateOptional } from '../middleware/auth.js';
 
 export const titleRouter = Router();
@@ -9,3 +9,5 @@ export const titleRouter = Router();
 titleRouter.get('/', authenticateOptional, listTitles);
 titleRouter.get('/:id', getTitleById);
 titleRouter.get('/:id/similar', listSimilarTitles);
+titleRouter.get('/:id/actors', listPopularActors);
+
