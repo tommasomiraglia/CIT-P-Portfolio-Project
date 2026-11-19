@@ -3,7 +3,12 @@ import { pool } from '../db/pool.js';
 import type { Queryable } from '../db/transaction.js';
 import { toLimitOffset } from '../lib/paging.js';
 import type { PageRequest } from '../types/page.js';
-import type { TitleRow, TitleSearchRow, SimilarTitleRow } from '../types/title.js';
+import type {
+  TitleRow, 
+  TitleSearchRow, 
+  SimilarTitleRow
+} from '../types/title.js';
+import type { PopularActorRow } from '../types/person.js';
 
 // $1 is a placeholder: pg sends the id separately from the SQL text,
 // so a malicious id can never change the query (no SQL injection).
@@ -49,6 +54,19 @@ export async function findSimilarTitles(
   const { limit, offset } = toLimitOffset(pageRequest);
   const result = await db.query<SimilarTitleRow>(
     'SELECT tconst, primarytitle, freq::int AS freq FROM similarity_search($1, $2, $3)',
+    [tconst, limit, offset],
+  );
+  return result.rows;
+}
+
+export async function findPopularActors(
+  db: Queryable,
+  tconst: string,
+  pageRequest: PageRequest,
+): Promise<PopularActorRow[]> {
+  const { limit, offset } = toLimitOffset(pageRequest);
+  const result = await db.query<PopularActorRow>(
+    'SELECT nconst, primaryname, rating::float8 AS rating, votes FROM popular_actors_in_movie($1, $2, $3)',
     [tconst, limit, offset],
   );
   return result.rows;
