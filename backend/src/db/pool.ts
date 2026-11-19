@@ -4,8 +4,13 @@
 import pg from 'pg';
 import { config } from '../config/index.js';
 
+const { ssl, sslVerify, ...connection } = config.db;
+
 export const pool = new pg.Pool({
-  ...config.db,
+  ...connection,
+  // rejectUnauthorized: false still encrypts, but accepts any certificate, even an
+  // expired one or one from someone posing as the server.
+  ssl: ssl ? { rejectUnauthorized: sslVerify } : false,
   max: 10,
   idleTimeoutMillis: 30_000,
   connectionTimeoutMillis: 5_000,

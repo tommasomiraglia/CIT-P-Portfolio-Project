@@ -28,6 +28,10 @@ export interface DatabaseConfig {
   database: string;
   user: string;
   password: string;
+  // Encrypt the connection to the database with TLS.
+  ssl: boolean;
+  // Check the server's certificate. Only meaningful when ssl is true.
+  sslVerify: boolean;
 }
 
 export interface AppConfig {
@@ -106,6 +110,19 @@ function parseOrigins(name: string, value: string): string[] {
   return origins;
 }
 
+// Only "true" and "false": a typo such as "flase" must stop the start-up, not silently
+// fall back to a default, since one of these settings turns off a security check.
+function parseBoolean(name: string, value: string | undefined, fallback: boolean): boolean {
+  const text = value?.trim().toLowerCase();
+  if (text === undefined || text === '') {
+    return fallback;
+  }
+  if (text !== 'true' && text !== 'false') {
+    throw new ConfigError(`${name} must be "true" or "false", got "${value}".`);
+  }
+  return text === 'true';
+}
+
 function checkJwtSecret(value: string): string {
   if (value.length < MIN_JWT_SECRET_LENGTH) {
     throw new ConfigError(
@@ -131,6 +148,11 @@ function loadConfig(): AppConfig {
       database: env.DB_NAME,
       user: env.DB_USER,
       password: env.DB_PASSWORD,
+      // Off by default: a local PostgreSQL usually has no TLS set up.
+      ssl: parseBoolean('DB_SSL', process.env.DB_SSL, false),
+      // On by default: without the check, anyone between the API and the database could
+      // pose as the server and read the password and every query.
+      sslVerify: parseBoolean('DB_SSL_VERIFY', process.env.DB_SSL_VERIFY, true),
     },
   };
 }
