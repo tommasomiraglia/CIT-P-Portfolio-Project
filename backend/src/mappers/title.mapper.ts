@@ -1,5 +1,5 @@
 // Converts a title row from the database into the TitleDto the API sends.
-import type { TitleDto, TitleRow, TitleSearchRow, TitleSummaryDto } from '../types/title.js';
+import type { TitleDto, TitleRow, TitleSearchRow, TitleSummaryDto, SimilarTitleRow, SimilarTitleDto } from '../types/title.js';
 
 // The OMDB import stores "N/A" (and sometimes an empty string) where a value is unknown.
 // The API uses null for every missing value, so clients only have one case to handle.
@@ -31,5 +31,16 @@ export function toTitleSummaryDto(row: TitleSearchRow): TitleSummaryDto {
     url: titleUrl(row.tconst),
     id: row.tconst,
     title: row.primarytitle,
+  };
+}
+
+
+// One similarity_search row → a similar title in a list.
+export function toSimilarTitleDto(row: SimilarTitleRow): SimilarTitleDto {
+  return {
+    url: titleUrl(row.tconst),
+    id: row.tconst,
+    title: row.primarytitle,
+    sharedGenres: row.freq,
   };
 }

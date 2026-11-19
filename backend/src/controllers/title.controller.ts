@@ -3,7 +3,7 @@ import type { Request, Response } from 'express';
 import { parseTitleId } from '../lib/ids.js';
 import { buildPage, parsePageRequest } from '../lib/paging.js';
 import { BadRequestError } from '../middleware/errors.js';
-import { getTitle, searchTitles } from '../services/title.service.js';
+import { getSimilarTitles, getTitle, searchTitles } from '../services/title.service.js';
 
 // Express 5 catches errors thrown by async handlers and passes them to the error
 // handler, so there is no try/catch here.
@@ -35,5 +35,12 @@ export async function listTitles(req: Request, res: Response): Promise<void> {
   const pageRequest = parsePageRequest(req.query);
   const slice = await searchTitles(search, pageRequest, req.user?.id);
   // originalUrl, not url: inside the router req.url has lost the /api/titles prefix.
+  res.json(buildPage(slice, pageRequest, req.originalUrl));
+}
+
+export async function listSimilarTitles(req: Request<{ id: string }>, res: Response): Promise<void> {
+  const id = parseTitleId(req.params.id);
+  const pageRequest = parsePageRequest(req.query);
+  const slice = await getSimilarTitles(id, pageRequest);
   res.json(buildPage(slice, pageRequest, req.originalUrl));
 }

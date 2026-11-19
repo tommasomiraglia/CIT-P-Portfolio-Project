@@ -2,11 +2,11 @@
 
 import { pool } from '../db/pool.js';
 import { takePage } from '../lib/paging.js';
-import { toTitleDto, toTitleSummaryDto } from '../mappers/title.mapper.js';
+import { toTitleDto, toTitleSummaryDto, toSimilarTitleDto } from '../mappers/title.mapper.js';
 import { NotFoundError } from '../middleware/errors.js';
-import { findTitleById, searchTitlesByText } from '../repositories/title.repository.js';
+import { findSimilarTitles, findTitleById, searchTitlesByText } from '../repositories/title.repository.js';
 import type { PageRequest, PageSlice } from '../types/page.js';
-import type { TitleDto, TitleSummaryDto } from '../types/title.js';
+import type { SimilarTitleDto, TitleDto, TitleSummaryDto } from '../types/title.js';
 import { saveSearch } from './search-history.service.js';
 
 export async function getTitle(tconst: string): Promise<TitleDto> {
@@ -32,4 +32,17 @@ export async function searchTitles(
   }
   const rows = await searchTitlesByText(pool, query, pageRequest);
   return takePage(rows, pageRequest, toTitleSummaryDto);
+}
+
+
+export async function getSimilarTitles(
+  tconst: string,
+  pageRequest: PageRequest,
+): Promise<PageSlice<SimilarTitleDto>> {
+  const title = await findTitleById(tconst);
+  if (!title) {
+    throw new NotFoundError(`Title ${tconst} not found`);
+  }
+  const rows = await findSimilarTitles(pool, tconst, pageRequest);
+  return takePage(rows, pageRequest, toSimilarTitleDto);
 }

@@ -41,3 +41,14 @@ export interface TitleSummaryDto {
   id: string;
   title: string;
 }
+// One row of similarity_search(): a title and how many genres it shares with the given title
+export interface SimilarTitleRow {
+  tconst: string;
+  primarytitle: string;
+  freq: number;
+}
+// A similar title in a list: a title in a list and the number of genres it shares.
+
+export interface SimilarTitleDto extends TitleSummaryDto {
+  sharedGenres: number;
+}

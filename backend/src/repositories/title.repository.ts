@@ -3,7 +3,7 @@ import { pool } from '../db/pool.js';
 import type { Queryable } from '../db/transaction.js';
 import { toLimitOffset } from '../lib/paging.js';
 import type { PageRequest } from '../types/page.js';
-import type { TitleRow, TitleSearchRow } from '../types/title.js';
+import type { TitleRow, TitleSearchRow, SimilarTitleRow } from '../types/title.js';
 
 // $1 is a placeholder: pg sends the id separately from the SQL text,
 // so a malicious id can never change the query (no SQL injection).
@@ -37,6 +37,19 @@ export async function searchTitlesByText(
   const result = await db.query<TitleSearchRow>(
     'SELECT tconst, primarytitle FROM string_search($1, $2, $3)',
     [query, limit, offset],
+  );
+  return result.rows;
+}
+
+export async function findSimilarTitles(
+  db: Queryable,
+  tconst: string,
+  pageRequest: PageRequest,
+): Promise<SimilarTitleRow[]> {
+  const { limit, offset } = toLimitOffset(pageRequest);
+  const result = await db.query<SimilarTitleRow>(
+    'SELECT tconst, primarytitle, freq::int AS freq FROM similarity_search($1, $2, $3)',
+    [tconst, limit, offset],
   );
   return result.rows;
 }
