@@ -61,8 +61,10 @@ Ids are validated before use (2-D.2): titles match `tt` plus 7 or 8 digits, peop
 | `POST /api/auth/login` | - | None |
 | `GET`, `PATCH`, `DELETE /api/users/:userId` | `get_user`, `update_user`, `delete_user` | Same user |
 | `GET /api/users/:userId/bookmarks/titles` | `get_bookmarked_titles` | Same user |
+| `GET /api/users/:userId/bookmarks/titles/:titleId` | - | Same user |
 | `PUT`, `DELETE /api/users/:userId/bookmarks/titles/:titleId` | `bookmark_title`, `remove_bookmark_title` | Same user |
 | `GET /api/users/:userId/bookmarks/people` | `get_bookmarked_persons` | Same user |
+| `GET /api/users/:userId/bookmarks/people/:personId` | - | Same user |
 | `PUT`, `DELETE /api/users/:userId/bookmarks/people/:personId` | `bookmark_person`, `remove_bookmark_person` | Same user |
 | `GET /api/users/:userId/ratings` | `get_rating_history` | Same user |
 | `GET /api/users/:userId/ratings/:titleId` | - | Same user |
@@ -155,6 +157,19 @@ Other fields are ignored.
 - Deleting an entry the user does not have is a `404`, also when it belongs to another user.
 - Deleting the whole history answers `204` also when it was already empty.
 
+### 1.13 Bookmarks: `/api/users/:userId/bookmarks/titles` and `/bookmarks/people`
+
+- A user bookmarks titles and people; both collections follow the same rules.
+- `:titleId` and `:personId` are validated as in 1.5, before the database is asked: an invalid id is a `400`.
+- `PUT` takes no body and answers `200` with the bookmark, also when it already existed (1.6): `bookmark_title` and `bookmark_person` then return false, which is not an error.
+- A title or person that does not exist is a `404` for `PUT`, checked before the bookmark is written, so the client never sees a foreign key error.
+- `GET` of a single bookmark answers `200` when it exists and `404` when it does not.
+  `DELETE` answers `204` with no body, and `404` when there was no bookmark: `remove_bookmark_title` and `remove_bookmark_person` return false.
+- The lists are paged (section 3) and ordered by title or by name, as `get_bookmarked_titles` and `get_bookmarked_persons` return them.
+- `GET /api/users/:userId/bookmarks/titles/:titleId` and `.../people/:personId` have no database function: the repository reads the one row itself, as for ratings (1.10).
+  They exist so that a title or person page can show whether the bookmark button is on without paging through the whole list.
+- A user deleted after logging in gets a `401` on every bookmark route (4.3), never an empty list, a `404` or a `500`.
+
 ## 2. JSON representations
 
 ### 2.1 Plain JSON with `url` fields
@@ -225,6 +240,20 @@ The client follows `url` for the full title.
 | `title` | object | The rated title: `{ "url": "/api/titles/tt0052520", "name": "The Twilight Zone" }` (2.4) |
 | `rating` | number | Whole number from 1 to 10 |
 | `comment` | string or `null` | The user's comment |
+
+**Title bookmark** (`GET` and `PUT /api/users/:userId/bookmarks/titles/:titleId`, and the items of `GET /api/users/:userId/bookmarks/titles`):
+
+| Field | Type | Meaning |
+| --- | --- | --- |
+| `url` | string | URI of the bookmark, `/api/users/:userId/bookmarks/titles/:titleId` |
+| `title` | object | The bookmarked title: `{ "url": "/api/titles/tt0052520", "name": "The Twilight Zone" }` (2.4) |
+
+**Person bookmark** (`GET` and `PUT /api/users/:userId/bookmarks/people/:personId`, and the items of `GET /api/users/:userId/bookmarks/people`):
+
+| Field | Type | Meaning |
+| --- | --- | --- |
+| `url` | string | URI of the bookmark, `/api/users/:userId/bookmarks/people/:personId` |
+| `person` | object | The bookmarked person: `{ "url": "/api/people/nm0000138", "name": "Leonardo DiCaprio" }` (2.4) |
 
 **Genre** (the items of `GET /api/genres` and genre preference endpoints):
 

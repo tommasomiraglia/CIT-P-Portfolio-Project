@@ -13,10 +13,15 @@ import type {
   PersonWordDto,
   PersonWordRow,
 } from '../types/person.js';
+import { titleUrl } from './title.mapper.js';
+
+export function personUrl(nconst: string): string {
+  return `/api/people/${nconst}`;
+}
 
 export function toPersonSummaryDto(row: PersonSearchRow): PersonSummaryDto {
   return {
-    url: `/api/people/${row.nconst}`,
+    url: personUrl(row.nconst),
     id: row.nconst,
     name: row.primaryname,
   };
@@ -25,7 +30,7 @@ export function toPersonSummaryDto(row: PersonSearchRow): PersonSummaryDto {
 // One knownFor row turns into { url, title } for the API.
 function toKnownForTitleDto(row: PersonKnownForRow): KnownForTitleDto {
   return {
-    url: `/api/titles/${row.tconst}`,
+    url: titleUrl(row.tconst),
     title: row.primarytitle,
   };
 }
@@ -33,7 +38,7 @@ function toKnownForTitleDto(row: PersonKnownForRow): KnownForTitleDto {
 // One co_players row results a co-player in a list: a person in a list plus the number of shared titles
 export function toCoPlayerDto(row: CoPlayerRow): CoPlayerDto {
   return {
-    url: `/api/people/${row.nconst}`,
+    url: personUrl(row.nconst),
     id: row.nconst,
     name: row.primaryname,
     sharedTitles: row.freq,
@@ -56,7 +61,7 @@ export function toPersonDto(
   professions: PersonProfessionRow[],
   knownFor: PersonKnownForRow[],
 ): PersonDto {
-  const url = `/api/people/${person.nconst}`;
+  const url = personUrl(person.nconst);
   return {
     url,
     id: person.nconst,

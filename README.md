@@ -156,6 +156,14 @@ Files ending in `.api.test.ts`, and `api.test.ts`, send real HTTP requests to th
 | `GET /api/users/:userId/ratings/:titleId` | Same token rules. `200` with the user's rating of that title, `404` if they have not rated it |
 | `PUT /api/users/:userId/ratings/:titleId` | Same token rules. Body `{ "rating": 1-10, "comment": "..." }`: `200` with the rating, `400` for an invalid rating or comment, `404` if no title has that id |
 | `DELETE /api/users/:userId/ratings/:titleId` | Same token rules. `204`, or `404` if there was no rating |
+| `GET /api/users/:userId/bookmarks/titles` | Same token rules. `200` with one page of the user's bookmarked titles, ordered by title |
+| `GET /api/users/:userId/bookmarks/titles/:titleId` | Same token rules. `200` with the bookmark, `400` if `:titleId` is not a title id, `404` if the user has not bookmarked that title |
+| `PUT /api/users/:userId/bookmarks/titles/:titleId` | Same token rules. `200` with the bookmark, also when it already existed, `400` as above, `404` if no title has that id |
+| `DELETE /api/users/:userId/bookmarks/titles/:titleId` | Same token rules. `204`, `400` as above, `404` if there was no bookmark |
+| `GET /api/users/:userId/bookmarks/people` | Same token rules. `200` with one page of the user's bookmarked people, ordered by name |
+| `GET /api/users/:userId/bookmarks/people/:personId` | Same token rules. `200` with the bookmark, `400` if `:personId` is not a person id, `404` if the user has not bookmarked that person |
+| `PUT /api/users/:userId/bookmarks/people/:personId` | Same token rules. `200` with the bookmark, also when it already existed, `400` as above, `404` if no person has that id |
+| `DELETE /api/users/:userId/bookmarks/people/:personId` | Same token rules. `204`, `400` as above, `404` if there was no bookmark |
 | `GET /api/users/:userId/search-history` | Same token rules. `200` with one page of the user's searches, newest first |
 | `DELETE /api/users/:userId/search-history` | Same token rules. `204`, also when there was nothing to remove |
 | `DELETE /api/users/:userId/search-history/:entryId` | Same token rules. `204`, `400` if `:entryId` is not a positive integer, `404` if the user has no such entry |

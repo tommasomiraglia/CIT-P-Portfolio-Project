@@ -25,7 +25,7 @@ Framework data supports create, read, update and delete as far as each operation
 | --- | --- | --- | --- | --- |
 | User | `POST /api/users` | `GET` | `PATCH` | `DELETE` |
 | Rating | `PUT .../ratings/:titleId` | `GET` the list | `PUT` again | `DELETE` |
-| Bookmark | `PUT .../bookmarks/titles/:titleId` | `GET` the list | - | `DELETE` |
+| Bookmark | `PUT .../bookmarks/titles/:titleId` or `.../bookmarks/people/:personId` | `GET` the list or one bookmark | - | `DELETE` |
 | Genre preference | `PUT .../genres/:genreId` | `GET` the list | - | `DELETE` |
 | Search history entry | Saved by a logged-in search | `GET` the list | - | `DELETE` one or all |
 
@@ -85,7 +85,7 @@ The stories that need more led to these operations:
 | `GET /api/titles/:id/episodes` | Episodes of a series | Otherwise a series page cannot reach its episodes. |
 | `GET /api/genres` | Choosing favourite genres | The client needs the list of genres to offer. |
 | `GET /api/users/:userId/ratings/:titleId` | Own rating on a title page | Without it, the client must page through every rating to find one. |
-| `GET .../bookmarks/titles/:titleId` | Bookmark button | Same reason, for the state of the bookmark button. |
+| `GET .../bookmarks/titles/:titleId` and `.../bookmarks/people/:personId` | Bookmark button | Same reason, for the state of the bookmark button. |
 | `GET /api/users/:userId`, `POST /api/auth/login` | Profile, login | No database function covers them; the interface needs them for 2-D.6. |
 
 ## Decisions where another design was possible

@@ -1,6 +1,7 @@
 // HTTP handlers for /api/people: validate the request, call the service, send the json
 
 import type { Request, Response } from 'express';
+import { parsePersonId } from '../lib/ids.js';
 import { buildPage, parsePageRequest } from '../lib/paging.js';
 import { BadRequestError } from '../middleware/errors.js';
 import {
@@ -12,18 +13,6 @@ import {
 
 // Bounds the work of one name: the text is matched against every person name.
 const MAX_SEARCH_LENGTH = 200;
-
-// IMDB person ids: "nm" followed by 7 or 8 digits, for example nm0000136.
-// Rejecting anything else early gives the client a clear 400 instead of a misleading 404.
-const PERSON_ID_PATTERN = /^nm\d{7,8}$/;
-
-// The :id of every /api/people/:id route.
-function parsePersonId(id: string): string {
-  if (!PERSON_ID_PATTERN.test(id)) {
-    throw new BadRequestError(`Invalid person id "${id}": expected "nm" followed by 7 or 8 digits`);
-  }
-  return id;
-}
 
 // GET /api/people/:id
 export async function getPersonById(req: Request<{ id: string }>, res: Response): Promise<void> {

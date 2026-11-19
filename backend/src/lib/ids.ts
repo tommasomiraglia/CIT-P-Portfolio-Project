@@ -1,4 +1,5 @@
-// Validation of numeric ids in URLs (docs/api-design.md 1.5: positive integers).
+// Validation of the ids in URLs (docs/api-design.md 1.5): positive integers, and IMDB
+// title and person ids.
 import { BadRequestError } from '../middleware/errors.js';
 
 // Digits only, no leading zero. The upper bound is PostgreSQL's INTEGER, the type of the
@@ -22,6 +23,18 @@ export function parseTitleId(value: string): string {
   if (!TITLE_ID.test(value)) {
     throw new BadRequestError(
       `Invalid title id "${value}": expected "tt" followed by 7 or 8 digits`,
+    );
+  }
+  return value;
+}
+
+// IMDB person ids: "nm" followed by 7 or 8 digits, for example nm0000136.
+const PERSON_ID = /^nm\d{7,8}$/;
+
+export function parsePersonId(value: string): string {
+  if (!PERSON_ID.test(value)) {
+    throw new BadRequestError(
+      `Invalid person id "${value}": expected "nm" followed by 7 or 8 digits`,
     );
   }
   return value;

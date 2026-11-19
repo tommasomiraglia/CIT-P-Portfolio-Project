@@ -12,6 +12,7 @@ import {
   putOwnGenre,
 } from '../controllers/user.controller.js';
 import { authenticate, authorizeSelf } from '../middleware/auth.js';
+import { bookmarkRouter } from './bookmark.routes.js';
 import { ratingRouter } from './rating.routes.js';
 
 export const userRouter = Router();
@@ -32,5 +33,6 @@ ownUserRouter.get('/genres/:genreId', getOwnGenre);
 ownUserRouter.put('/genres/:genreId', putOwnGenre);
 ownUserRouter.delete('/genres/:genreId', deleteOwnGenre);
 ownUserRouter.use('/ratings', ratingRouter);
+ownUserRouter.use('/bookmarks', bookmarkRouter);
 
 userRouter.use('/:userId', authenticate, authorizeSelf, ownUserRouter);

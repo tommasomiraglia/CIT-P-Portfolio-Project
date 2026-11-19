@@ -22,10 +22,10 @@ A user can do everything a visitor can.
 | --- | --- | --- | --- |
 | S1 | As a visitor, I want to search titles by a word from their name or plot, so that I can find a movie without knowing its exact title. | `GET /api/titles?search=` | Built |
 | S2 | As a visitor, I want to search by title, plot, character and actor at the same time, so that I can find a movie I only half remember ("the one where Ledger plays the Joker"). | `GET /api/titles?title=&plot=&characters=&names=` | To build |
-| S3 | As a visitor, I want to search for people by name, so that I can open the page of an actor or director. | `GET /api/people?name=` | To build |
+| S3 | As a visitor, I want to search for people by name, so that I can open the page of an actor or director. | `GET /api/people?name=` | Built (api-design.md 1.8) |
 | S4 | As a visitor, I want to search with several keywords and choose whether titles must contain all of them, any of them, or be ranked by how well they match, so that I can widen or narrow my results. | `GET /api/titles?words=&match=exact\|any\|ranked` | To build |
 | S5 | As a visitor, I want to see which words often appear together with my keywords, so that I can find better words to search with. | `GET /api/words?words=` | To build |
-| S6 | As a visitor, I want long result lists split into pages that I can move through, so that the application stays fast and I am not flooded with results. | `?page=&pageSize=` on every list | Built (helper and S1) |
+| S6 | As a visitor, I want long result lists split into pages that I can move through, so that the application stays fast and I am not flooded with results. | `?page=&pageSize=` on every list | Built for every list that exists (api-design.md 3) |
 
 ## Titles and people
 
@@ -36,9 +36,9 @@ A user can do everything a visitor can.
 | T3 | As a visitor, I want to see titles similar to the one I am looking at, so that I can find something else I might like. | `GET /api/titles/:id/similar` | To build |
 | T4 | As a visitor, I want to see the alternative titles of a title, so that I can recognise a movie by the name it has in my country. | **new** `GET /api/titles/:id/alternative-titles` | Not designed |
 | T5 | As a visitor, I want to see the episodes of a series, so that I can browse it season by season. | **new** `GET /api/titles/:id/episodes` | Not designed |
-| P1 | As a visitor, I want a person page with their professions, rating and the titles they are known for, so that I can see who they are. | `GET /api/people/:id` | To build |
-| P2 | As a visitor, I want to see the actors a person has worked with most often, so that I can discover related people. | `GET /api/people/:id/co-players` | To build |
-| P3 | As a visitor, I want to see the words most typical of a person's titles, so that I get a quick idea of what their work is about. | `GET /api/people/:id/words` | To build |
+| P1 | As a visitor, I want a person page with their professions, rating and the titles they are known for, so that I can see who they are. | `GET /api/people/:id` | Built (api-design.md 1.9) |
+| P2 | As a visitor, I want to see the actors a person has worked with most often, so that I can discover related people. | `GET /api/people/:id/co-players` | Built (api-design.md 1.9) |
+| P3 | As a visitor, I want to see the words most typical of a person's titles, so that I get a quick idea of what their work is about. | `GET /api/people/:id/words` | Built (api-design.md 1.9) |
 
 ## Account
 
@@ -64,20 +64,20 @@ A user can do everything a visitor can.
 
 | Id | Story | Endpoints | Status |
 | --- | --- | --- | --- |
-| B1 | As a user, I want to bookmark titles and people, so that I can find them again quickly. | `PUT /api/users/:userId/bookmarks/titles/:titleId`, `.../people/:personId` | To build |
-| B2 | As a user, I want a list of my bookmarks, so that I can open them later. | `GET .../bookmarks/titles`, `GET .../bookmarks/people` | To build |
-| B3 | As a user, I want to see on a title or person page whether I bookmarked it, so that the bookmark button shows the right state. | **new** `GET .../bookmarks/titles/:titleId`, `.../people/:personId` (`200` or `404`) | Not designed |
-| B4 | As a user, I want to remove a bookmark, so that my list only holds what I still care about. | `DELETE .../bookmarks/titles/:titleId`, `.../people/:personId` | To build |
+| B1 | As a user, I want to bookmark titles and people, so that I can find them again quickly. | `PUT /api/users/:userId/bookmarks/titles/:titleId`, `.../people/:personId` | Built (api-design.md 1.13) |
+| B2 | As a user, I want a list of my bookmarks, so that I can open them later. | `GET .../bookmarks/titles`, `GET .../bookmarks/people` | Built (api-design.md 1.13) |
+| B3 | As a user, I want to see on a title or person page whether I bookmarked it, so that the bookmark button shows the right state. | **new** `GET .../bookmarks/titles/:titleId`, `.../people/:personId` (`200` or `404`) | Built (api-design.md 1.13) |
+| B4 | As a user, I want to remove a bookmark, so that my list only holds what I still care about. | `DELETE .../bookmarks/titles/:titleId`, `.../people/:personId` | Built (api-design.md 1.13) |
 
 ## Search history and preferences
 
 | Id | Story | Endpoints | Status |
 | --- | --- | --- | --- |
 | H1 | As a user, I want my searches saved automatically, so that I do not have to remember them. | Done by the searches when a token is sent | Built for S1 |
-| H2 | As a user, I want to see my past searches, newest first, and run one again with one click, so that I can return to earlier results. | `GET /api/users/:userId/search-history` | To build |
-| H3 | As a user, I want to delete one search or my whole history, so that I control what is kept about me. | `DELETE .../search-history/:entryId`, `DELETE .../search-history` | To build |
-| G1 | As a user, I want to choose my favourite genres from the list of all genres, so that the application knows what I like. | **new** `GET /api/genres`, and `PUT`, `DELETE /api/users/:userId/genres/:genreId` | `GET /api/genres` not designed, the rest to build |
-| G2 | As a user, I want to see my favourite genres, so that I can check and change them. | `GET /api/users/:userId/genres` | To build |
+| H2 | As a user, I want to see my past searches, newest first, and run one again with one click, so that I can return to earlier results. | `GET /api/users/:userId/search-history` | Built (api-design.md 1.12) |
+| H3 | As a user, I want to delete one search or my whole history, so that I control what is kept about me. | `DELETE .../search-history/:entryId`, `DELETE .../search-history` | Built (api-design.md 1.12) |
+| G1 | As a user, I want to choose my favourite genres from the list of all genres, so that the application knows what I like. | **new** `GET /api/genres`, and `PUT`, `DELETE /api/users/:userId/genres/:genreId` | Built (api-design.md 1.11) |
+| G2 | As a user, I want to see my favourite genres, so that I can check and change them. | `GET /api/users/:userId/genres` | Built (api-design.md 1.11) |
 | L1 | As a user, I want to set my preferred language and region, so that alternative titles in my language can be shown first. | Not in the API (api-design.md 4.5 leaves `langid` and `regionid` out) | Group decision, see below |
 
 ## Operations beyond 2-A.1
@@ -111,5 +111,5 @@ Each is justified by the stories that need it.
    Either add `GET /api/languages` and `GET /api/regions` and accept `langId` and `regionId` in the user, or drop the story.
    It only pays off together with T4.
 5. **Which "new" operations to build at all.**
-   T4, T5, R3, B3 and `GET /api/genres` are each small, but every one is more code, tests and report.
-   R3, B3 and `GET /api/genres` matter most, because the frontend cannot show a correct title page or preferences screen without them.
+   R3, B3 and `GET /api/genres` are built, because the frontend could not show a correct title page or preferences screen without them.
+   T4 and T5 are each small too, but every one is more code, tests and report.
