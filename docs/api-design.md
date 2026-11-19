@@ -301,6 +301,16 @@ the fields of a person in a list, plus `sharedTitles` (integer), the number of t
 A word is not a resource of its own, so its `url` leads to the titles that contain it.
 That link works once the word search of 1.5 is implemented.
 
+
+**Similar title in a list** (the items of `GET /api/titles/:id/similar`):
+the fields of a title in a list, plus `sharedGenres` (integer), the number of genres it shares with the title.
+Only titles of the same type are compared. Ordered by `sharedGenres`, then by number of votes, highest first.
+
+**Actor in a list** (the items of `GET /api/titles/:id/actors`):
+the fields of a person in a list, plus `rating` (number) and `votes` (integer).
+These are the actor's own rating over all their titles, not a rating of this role.
+Actors without a rating are left out. Ordered by `rating`, then by `votes`, highest first.
+
 **User**: see 4.5.
 
 ## 3. Paging
