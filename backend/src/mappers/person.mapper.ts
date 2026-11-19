@@ -12,6 +12,8 @@ import type {
   PersonSummaryDto,
   PersonWordDto,
   PersonWordRow,
+  PopularActorRow,
+  PopularActorDto
 } from '../types/person.js';
 import { titleUrl } from './title.mapper.js';
 
@@ -44,6 +46,18 @@ export function toCoPlayerDto(row: CoPlayerRow): CoPlayerDto {
     sharedTitles: row.freq,
   };
 }
+
+// One popular_actors_in_movie row → an actor in a list, with their own rating and votes.
+export function toPopularActorDto(row: PopularActorRow): PopularActorDto {
+  return {
+    url: personUrl(row.nconst),
+    id: row.nconst,
+    name: row.primaryname,
+    rating: row.rating,
+    votes: row.votes,
+  };
+}
+
 
 export function toPersonWordDto(row: PersonWordRow): PersonWordDto {
   return {

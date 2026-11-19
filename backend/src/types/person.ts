@@ -68,3 +68,16 @@ export interface PersonWordDto {
   word: string;
   frequency: number;
 }
+
+
+export interface PopularActorRow {
+  nconst: string;
+  primaryname: string;
+  rating: number;
+  votes: number;
+}
+
+export interface PopularActorDto extends PersonSummaryDto {
+  rating: number;
+  votes: number;
+}
