@@ -1,7 +1,7 @@
 // Database access for users. Each function takes the connection to use as its first
 // parameter (pool, or a client inside withTransaction), see CONTRIBUTING.md.
 import type { Queryable } from '../db/transaction.js';
-import type { NewUser, UserCredentialsRow, UserRow } from '../types/user.js';
+import type { NewUser, ProfileChanges, UserCredentialsRow, UserRow } from '../types/user.js';
 
 // Thrown when the username or email is already taken. The service turns it into a 409;
 // the repository only says which value clashed, without anything about HTTP.
@@ -47,13 +47,48 @@ export async function insertUser(db: Queryable, user: NewUser): Promise<number> 
     }
     return userId;
   } catch (error) {
-    const field =
-      isPostgresError(error) && error.code === UNIQUE_VIOLATION && error.constraint
-        ? DUPLICATE_FIELD_BY_CONSTRAINT[error.constraint]
-        : undefined;
-    // Any other error, including a UNIQUE violation on a constraint we do not know,
-    // stays a 500: it would be a bug, not something the client did wrong.
-    throw field ? new DuplicateUserError(field) : error;
+    throw asDuplicateUserError(error);
+  }
+}
+
+// The UNIQUE constraints are the real check for a taken username or email: two requests
+// that claim the same value at the same moment both pass any SELECT done beforehand, but
+// only one of them passes the constraint. So no separate "is it taken?" query is needed.
+// Any other error, including a UNIQUE violation on a constraint we do not know, stays as
+// it is and becomes a 500: it would be a bug, not something the client did wrong.
+function asDuplicateUserError(error: unknown): unknown {
+  const field =
+    isPostgresError(error) && error.code === UNIQUE_VIOLATION && error.constraint
+      ? DUPLICATE_FIELD_BY_CONSTRAINT[error.constraint]
+      : undefined;
+  return field ? new DuplicateUserError(field) : error;
+}
+
+// Changes the fields present in `changes` and leaves the others. Returns false when the
+// user does not exist. Throws DuplicateUserError for a username or email that is taken.
+export async function updateUser(
+  db: Queryable,
+  userId: number,
+  changes: ProfileChanges,
+): Promise<boolean> {
+  // update_user keeps a field whose argument is NULL, so a missing field is passed as NULL,
+  // and removing the phone number needs its own flag.
+  const clearPhoneNumber = changes.phoneNumber === null;
+  try {
+    const result = await db.query<{ updated: boolean }>(
+      `SELECT update_user($1, p_username => $2, p_email => $3, p_phonenumber => $4,
+                          p_clear_phonenumber => $5) AS updated`,
+      [
+        userId,
+        changes.username ?? null,
+        changes.email ?? null,
+        changes.phoneNumber ?? null,
+        clearPhoneNumber,
+      ],
+    );
+    return result.rows[0]?.updated === true;
+  } catch (error) {
+    throw asDuplicateUserError(error);
   }
 }
 

@@ -47,7 +47,7 @@ A user can do everything a visitor can.
 | A1 | As a visitor, I want to register with a username, email and password, so that I can save ratings, bookmarks and searches. | `POST /api/users` | Built |
 | A2 | As a user, I want to log in, so that the application knows my data is mine. | `POST /api/auth/login` | Built |
 | A3 | As a user, I want to log out, so that nobody else on this computer can use my account. | None: the frontend deletes its token (api-design.md 4.3) | Nothing to build |
-| A4 | As a user, I want to see and change my profile, so that my email and phone number stay up to date. | `GET`, `PATCH /api/users/:userId` | `GET` built, `PATCH` to build |
+| A4 | As a user, I want to see and change my profile, so that my email and phone number stay up to date. | `GET`, `PATCH /api/users/:userId` | Built (api-design.md 1.14) |
 | A5 | As a user, I want to delete my account and all my data, so that I can leave the application. | `DELETE /api/users/:userId` | To build |
 
 ## Ratings

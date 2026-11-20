@@ -18,6 +18,8 @@ SELECT create_user('f1_test_user', 'f1_test@example.com', 'secret') AS userid \g
 SELECT * FROM get_user(:userid);                                   -- one row, no password column
 SELECT update_user(:userid, p_phonenumber => '12345678') AS updated;  -- t
 SELECT * FROM get_user(:userid);                                   -- phonenumber 12345678, the rest unchanged
+SELECT update_user(:userid, p_clear_phonenumber => TRUE) AS cleared;  -- t
+SELECT * FROM get_user(:userid);                                   -- phonenumber NULL, the rest unchanged
 SELECT update_user(-1, 'nobody') AS updated_missing_user;          -- f
 
 ------------------------------------------------------------------

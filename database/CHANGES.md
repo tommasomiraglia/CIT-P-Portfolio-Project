@@ -57,7 +57,7 @@ The REST API calls them on every request, which exposed four problems:
 | Function | Purpose |
 |---|---|
 | `get_user` | Reads one user, without the password. |
-| `update_user` | Updates a user; a `NULL` argument leaves that field unchanged. |
+| `update_user` | Updates a user; a `NULL` argument leaves that field unchanged. `p_clear_phonenumber => TRUE` removes the phone number, because `NULL` cannot mean both "unchanged" and "remove" (`PATCH /api/users/:userId` with `"phoneNumber": null`). |
 | `add_search_history` | Records one search (see above). |
 | `delete_search_history_entry` | Deletes one history entry of a user. |
 | `clear_search_history` | Deletes all history of a user and returns how many entries were removed. |

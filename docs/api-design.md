@@ -170,6 +170,27 @@ Other fields are ignored.
   They exist so that a title or person page can show whether the bookmark button is on without paging through the whole list.
 - A user deleted after logging in gets a `401` on every bookmark route (4.3), never an empty list, a `404` or a `500`.
 
+### 1.14 Changing your user: `PATCH /api/users/:userId`
+
+`PATCH` takes a JSON body with any of these fields; each follows the rule of registration (4.5):
+
+| Field | Rule |
+| --- | --- |
+| `username` | 3 to 30 characters: letters, digits, `_`, `.` and `-`. `null` is a `400`. |
+| `email` | An email address, at most 254 characters, stored in lowercase. `null` is a `400`. |
+| `phoneNumber` | Up to 30 digits, spaces, `+`, `-`, `(` and `)`, or `null` to remove the number. |
+
+- A field that is not sent stays as it is; other fields are ignored, as in registration.
+  The password cannot be changed here.
+- A body without any of the three fields is a `400`.
+  An invalid field is a `400` that names it, and then nothing is changed, also when other fields were valid.
+- A username or email that another user has is a `409` that says which one.
+  The database's `UNIQUE` constraints decide this, not a check before the update, so two users who claim the same value at the same moment get one `200` and one `409`, never a `500`.
+- The answer is `200` with the updated user, the same representation as `GET` (4.5).
+  The update and the read run in one transaction, so the answer shows exactly this change.
+- A user deleted after logging in gets a `401` (4.3).
+- `update_user` treats `NULL` as "leave unchanged", so it has a parameter `p_clear_phonenumber` for removing the phone number (`database/CHANGES.md`).
+
 ## 2. JSON representations
 
 ### 2.1 Plain JSON with `url` fields

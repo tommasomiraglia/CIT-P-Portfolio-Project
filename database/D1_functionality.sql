@@ -22,7 +22,8 @@
 -- words_query counts only title and plot words, leaves out the query words, and takes a limit of 10.
 
 -- get_user (without the password) and update_user (NULL leaves a field unchanged) complete create, read,
--- update and delete for users.
+-- update and delete for users. update_user takes p_clear_phonenumber, because NULL cannot also mean
+-- "remove the phone number".
 -- delete_user, the bookmark functions and their remove counterparts return true or false,
 -- so the API can tell "created" from "already there" and "deleted" from "not found".
 -- The four functions that list a user's bookmarks, search history and ratings take p_limit and p_offset
@@ -70,6 +71,7 @@ DROP FUNCTION IF EXISTS weights_search(TEXT[], INTEGER, INTEGER);
 DROP TABLE IF EXISTS weights;
 DROP FUNCTION IF EXISTS get_user(INTEGER);
 DROP FUNCTION IF EXISTS update_user(INTEGER, TEXT, TEXT, TEXT, INTEGER, INTEGER);
+DROP FUNCTION IF EXISTS update_user(INTEGER, TEXT, TEXT, TEXT, INTEGER, INTEGER, BOOLEAN);
 DROP FUNCTION IF EXISTS get_bookmarked_titles(INTEGER, INTEGER, INTEGER);
 DROP FUNCTION IF EXISTS get_bookmarked_persons(INTEGER, INTEGER, INTEGER);
 DROP FUNCTION IF EXISTS get_search_history(INTEGER, INTEGER, INTEGER);
@@ -138,20 +140,28 @@ $$ LANGUAGE plpgsql;
 
 
 
+-- A NULL argument leaves that field unchanged. The phone number is the one field a user may
+-- remove, and NULL cannot mean both "unchanged" and "remove", so p_clear_phonenumber does that.
 CREATE OR REPLACE FUNCTION update_user(
     p_userid INTEGER,
     p_username TEXT DEFAULT NULL,
     p_email TEXT DEFAULT NULL,
     p_phonenumber TEXT DEFAULT NULL,
     p_langid INTEGER DEFAULT NULL,
-    p_regionid INTEGER DEFAULT NULL
+    p_regionid INTEGER DEFAULT NULL,
+    p_clear_phonenumber BOOLEAN DEFAULT FALSE
 )
 RETURNS BOOLEAN AS $$
 BEGIN
+    IF p_clear_phonenumber AND p_phonenumber IS NOT NULL THEN
+        RAISE EXCEPTION 'update_user: give p_phonenumber or p_clear_phonenumber, not both';
+    END IF;
+
     UPDATE app_user
     SET username = coalesce(p_username, username),
         email = coalesce(p_email, email),
-        phonenumber = coalesce(p_phonenumber, phonenumber),
+        phonenumber = CASE WHEN p_clear_phonenumber THEN NULL
+                           ELSE coalesce(p_phonenumber, phonenumber) END,
         langid = coalesce(p_langid, langid),
         regionid = coalesce(p_regionid, regionid)
     WHERE userid = p_userid;

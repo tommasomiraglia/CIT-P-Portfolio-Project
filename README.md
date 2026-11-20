@@ -152,6 +152,7 @@ Files ending in `.api.test.ts`, and `api.test.ts`, send real HTTP requests to th
 | `POST /api/users` | Registers a user: `201` with the user and a `Location` header, `400` for an invalid field, `409` if the username or email is taken |
 | `POST /api/auth/login` | `200` with a token and the user, `401` for a wrong username or password |
 | `GET /api/users/:userId` | Needs `Authorization: Bearer <token>` for that same user: `200` with the user, `401` without a valid token, `403` for another user |
+| `PATCH /api/users/:userId` | Same token rules. Body with any of `username`, `email`, `phoneNumber` (`null` removes it): `200` with the user, `400` for an invalid field or none of the three, `409` if the username or email is taken |
 | `GET /api/users/:userId/ratings` | Same token rules. `200` with one page of the user's ratings (`page`, `pageSize`) |
 | `GET /api/users/:userId/ratings/:titleId` | Same token rules. `200` with the user's rating of that title, `404` if they have not rated it |
 | `PUT /api/users/:userId/ratings/:titleId` | Same token rules. Body `{ "rating": 1-10, "comment": "..." }`: `200` with the rating, `400` for an invalid rating or comment, `404` if no title has that id |
