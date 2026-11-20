@@ -31,7 +31,7 @@ A user can do everything a visitor can.
 
 | Id | Story | Endpoints | Status |
 | --- | --- | --- | --- |
-| T1 | As a visitor, I want a title page with poster, plot, year, runtime, genres and rating, so that I can decide whether to watch it. | `GET /api/titles/:id` | Built, but without genres and rating (see "Gaps" below) |
+| T1 | As a visitor, I want a title page with poster, plot, year, runtime, genres and rating, so that I can decide whether to watch it. | `GET /api/titles/:id` | Built, with genres and rating (api-design.md 2.6) |
 | T2 | As a visitor, I want to see the most popular actors of a title, so that I know who is in it. | `GET /api/titles/:id/actors` | To build |
 | T3 | As a visitor, I want to see titles similar to the one I am looking at, so that I can find something else I might like. | `GET /api/titles/:id/similar` | To build |
 | T4 | As a visitor, I want to see the alternative titles of a title, so that I can recognise a movie by the name it has in my country. | **new** `GET /api/titles/:id/alternative-titles` | Not designed |
@@ -98,8 +98,8 @@ Each is justified by the stories that need it.
 
 ## Gaps and decisions for the group
 
-1. **The title page lacks genres and rating (T1).**
-   `GET /api/titles/:id` returns neither yet, though the Subproject 1 design shows both.
+1. **The title page lacks genres and rating (T1).** Resolved.
+   `GET /api/titles/:id` now embeds both, as the Subproject 1 design shows them (api-design.md 2.6).
 2. **Search results are sorted alphabetically, not by relevance (S1).**
    `string_search` orders by title, so searching "twilight zone" lists episodes such as "A Season to Wither" before the series "The Twilight Zone" itself.
    Ordering title matches before plot matches, or by number of votes, would put the expected result first; it is a change to `D1_functionality.sql`.

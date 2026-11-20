@@ -232,6 +232,26 @@ The client follows `url` for the full person.
 
 The client follows `url` for the full title.
 
+**Title** (`GET /api/titles/:id`):
+
+| Field | Type | Meaning |
+| --- | --- | --- |
+| `url` | string | URI of the title, `/api/titles/:id` |
+| `id` | string | IMDB id, for example `tt0052520` |
+| `title` | string | Primary title |
+| `type` | string or `null` | Title type, for example `movie` or `tvSeries` |
+| `isAdult` | boolean or `null` | |
+| `startYear` | integer or `null` | Release year, or the first year of a series |
+| `endYear` | integer or `null` | Last year of a series, `null` for other titles and running series |
+| `runtimeMinutes` | integer or `null` | |
+| `plot` | string or `null` | |
+| `posterUrl` | string or `null` | Address of the poster image |
+| `genres` | string[] | Genre names, sorted by name, `[]` when the title has none. Embedded: a title has a handful at most (2.4) |
+| `rating` | object or `null` | `{ "average": 8.9, "votes": 92000 }`: the average rating (a number with one decimal) and the number of votes (integer), `null` when nobody has voted |
+
+The rating is the IMDB rating plus the votes of our users, which `PUT` and `DELETE` of 1.10 change.
+Similar titles and actors can be long lists, so they are not fields: they are the paged sub-resources `/api/titles/:id/similar` and `/api/titles/:id/actors` (2.4).
+
 **Rating** (`GET` and `PUT /api/users/:userId/ratings/:titleId`, and the items of `GET /api/users/:userId/ratings`):
 
 | Field | Type | Meaning |
@@ -300,7 +320,6 @@ the fields of a person in a list, plus `sharedTitles` (integer), the number of t
 
 A word is not a resource of its own, so its `url` leads to the titles that contain it.
 That link works once the word search of 1.5 is implemented.
-
 
 **Similar title in a list** (the items of `GET /api/titles/:id/similar`):
 the fields of a title in a list, plus `sharedGenres` (integer), the number of genres it shares with the title.

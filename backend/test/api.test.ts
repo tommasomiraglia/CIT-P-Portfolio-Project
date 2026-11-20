@@ -5,6 +5,7 @@ import request from 'supertest';
 import { afterAll, describe, expect, test } from 'vitest';
 import { app } from '../src/app.js';
 import { pool } from '../src/db/pool.js';
+import { findUnratedTitles, titleRating } from './helpers/test-ratings.js';
 
 // The first title in the dataset ordered by id, a TV series with no missing values.
 const EXISTING_TITLE_ID = 'tt0052520';
@@ -38,7 +39,30 @@ describe('GET /api/titles/:id', () => {
       runtimeMinutes: 50,
       plot: expect.any(String),
       posterUrl: expect.stringMatching(/^https:\/\//),
+      genres: expect.any(Array),
+      rating: { average: expect.any(Number), votes: expect.any(Number) },
     });
+  });
+
+  test('embeds the genres, sorted by name', async () => {
+    const { genres } = (await request(app).get(`/api/titles/${EXISTING_TITLE_ID}`)).body;
+    expect(genres).toEqual(['Drama', 'Fantasy', 'Horror']);
+  });
+
+  test('embeds the rating as numbers, the same values the database stores', async () => {
+    const { rating } = (await request(app).get(`/api/titles/${EXISTING_TITLE_ID}`)).body;
+    expect(rating).toEqual(await titleRating(EXISTING_TITLE_ID));
+    expect(Number.isInteger(rating.votes)).toBe(true);
+  });
+
+  test('gives "rating": null for a title nobody has rated', async () => {
+    // Offset 10: the rating tests take the unrated titles from offset 0 and 5 and rate
+    // them while this file runs, so this one must be a title none of them touches.
+    const [unrated] = await findUnratedTitles(1, 10);
+    const res = await request(app).get(`/api/titles/${unrated}`);
+    expect(res.status).toBe(200);
+    expect(res.body.rating).toBeNull();
+    expect(res.body.genres).toEqual(expect.any(Array));
   });
 
   test('returns 404 for an id that does not exist', async () => {

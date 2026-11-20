@@ -136,26 +136,30 @@ describe('PUT /api/users/:userId/ratings/:titleId', () => {
 });
 
 describe("the title's average rating", () => {
+  // Read through GET /api/titles/:id, as a client sees it, not from title_ratings.
+  const ratingShownFor = async (titleId: string) =>
+    (await request(app).get(`/api/titles/${titleId}`)).body.rating;
+
   test('changes after PUT and after DELETE', async () => {
     const alice = await users.create();
     const bob = await users.create();
-    expect(await titleRating(averageTitle)).toBeNull();
+    expect(await ratingShownFor(averageTitle)).toBeNull();
 
     await putRating(alice, averageTitle, { rating: 10 });
-    expect(await titleRating(averageTitle)).toEqual({ average: 10, votes: 1 });
+    expect(await ratingShownFor(averageTitle)).toEqual({ average: 10, votes: 1 });
 
     await putRating(bob, averageTitle, { rating: 5 });
-    expect(await titleRating(averageTitle)).toEqual({ average: 7.5, votes: 2 });
+    expect(await ratingShownFor(averageTitle)).toEqual({ average: 7.5, votes: 2 });
 
     // Changing a rating moves the average but is still the same vote.
     await putRating(bob, averageTitle, { rating: 7 });
-    expect(await titleRating(averageTitle)).toEqual({ average: 8.5, votes: 2 });
+    expect(await ratingShownFor(averageTitle)).toEqual({ average: 8.5, votes: 2 });
 
     expect((await deleteRating(bob, averageTitle)).status).toBe(204);
-    expect(await titleRating(averageTitle)).toEqual({ average: 10, votes: 1 });
+    expect(await ratingShownFor(averageTitle)).toEqual({ average: 10, votes: 1 });
 
     expect((await deleteRating(alice, averageTitle)).status).toBe(204);
-    expect(await titleRating(averageTitle)).toBeNull();
+    expect(await ratingShownFor(averageTitle)).toBeNull();
   });
 });
 

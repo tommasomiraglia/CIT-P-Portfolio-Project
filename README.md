@@ -141,7 +141,7 @@ Files ending in `.api.test.ts`, and `api.test.ts`, send real HTTP requests to th
 | Method and path | Response |
 | --- | --- |
 | `GET /api/health` | `200 {"status":"ok"}`, or `503` if the database does not answer |
-| `GET /api/titles/:id` | `200` with the title, `400` if `:id` is not a title id like `tt0052520`, `404` if no title has that id |
+| `GET /api/titles/:id` | `200` with the title, its genres and its rating, `400` if `:id` is not a title id like `tt0052520`, `404` if no title has that id |
 | `GET /api/titles?search=…` | `200` with one page of matching titles (`page`, `pageSize`), `400` for a missing or invalid parameter; saved to the history when a token is sent |
 | `GET /api/people?name=…` | `200` with one page of people whose name contains the text, `400` for a missing or invalid parameter; saved to the history when a token is sent |
 | `GET /api/people/:id` | `200` with the person, `400` if `:id` is not a person id like `nm0000138`, `404` if no person has that id |
@@ -189,7 +189,9 @@ curl.exe http://localhost:3000/api/titles/tt0052520    # plain "curl" is a diffe
   "endYear": 1964,
   "runtimeMinutes": 50,
   "plot": "The Twilight Zone is a place that exists ...",
-  "posterUrl": "https://m.media-amazon.com/images/M/..."
+  "posterUrl": "https://m.media-amazon.com/images/M/...",
+  "genres": ["Drama", "Fantasy", "Horror"],
+  "rating": { "average": 9, "votes": 109820 }
 }
 ```
 

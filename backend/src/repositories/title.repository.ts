@@ -3,15 +3,16 @@ import { pool } from '../db/pool.js';
 import type { Queryable } from '../db/transaction.js';
 import { toLimitOffset } from '../lib/paging.js';
 import type { PageRequest } from '../types/page.js';
-import type {
-  TitleRow, 
-  TitleSearchRow, 
-  SimilarTitleRow
-} from '../types/title.js';
 import type { PopularActorRow } from '../types/person.js';
+import type { SimilarTitleRow, TitleRow, TitleSearchRow } from '../types/title.js';
 
 // $1 is a placeholder: pg sends the id separately from the SQL text,
 // so a malicious id can never change the query (no SQL injection).
+// One query for the whole title: the rating is at most one row (LEFT JOIN, so an unrated
+// title still comes back), and ARRAY(...) folds the genres into one column, which is an
+// empty array, not NULL, when the title has none.
+// pg returns NUMERIC as a string so that no digits are lost; NUMERIC(5,1) fits a float8
+// exactly enough, so ::float8 makes it a JSON number, as findPersonById does.
 const FIND_TITLE_BY_ID = `
   SELECT tb.tconst,
          tb.primarytitle,
@@ -21,9 +22,19 @@ const FIND_TITLE_BY_ID = `
          tb.endyear,
          tb.runtimeminutes,
          tb.plot,
-         tb.poster_link
+         tb.poster_link,
+         tr.averagerating::float8 AS averagerating,
+         tr.numvotes,
+         ARRAY(
+           SELECT g.name
+           FROM generes_title_basic gtb
+           JOIN generes g ON g.genereid = gtb.genereid
+           WHERE gtb.tconst = tb.tconst
+           ORDER BY g.name
+         ) AS genres
   FROM title_basic tb
   LEFT JOIN title_basic_type tbt ON tbt.titletypeid = tb.titletypeid
+  LEFT JOIN title_ratings tr ON tr.tconst = tb.tconst
   WHERE tb.tconst = $1`;
 
 export async function findTitleById(tconst: string): Promise<TitleRow | undefined> {

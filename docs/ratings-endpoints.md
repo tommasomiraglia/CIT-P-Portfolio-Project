@@ -151,7 +151,8 @@ Cheap checks come first, and nothing touches the database before the request is 
 - `GET` of the list or of one rating for a user deleted after logging in answers an empty page or `404`, not `401`.
   Both are true statements about that user's ratings, and checking the user on every read would cost a query each time.
   `PUT` and `DELETE` do answer `401`.
-- `GET /api/titles/:id` does not show the average rating yet (task F), so the tests read `title_ratings` directly to see the average change.
+- The test of the average reads it through `GET /api/titles/:id`, as a client sees it.
+  The helpers in `helpers/test-ratings.ts` still read `title_ratings` directly where the test needs the database's own state: counting votes, the rollback test, and checking in `afterAll` that every test vote is gone.
 - Averages are stored with one decimal (`NUMERIC(5,1)`), so on a title with many votes, adding and removing a vote can leave the average 0.1 off.
   That is how `rate` and `unrate` from Subproject 1 work, not something the API adds.
 

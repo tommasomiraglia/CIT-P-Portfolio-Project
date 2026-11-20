@@ -1,8 +1,9 @@
 // A title as the database returns it (TitleRow) and as the API sends it (TitleDto).
 // Keeping both shapes lets the database schema change without changing the API contract.
 
-// One row of the query in title.repository.ts: title_basic joined with its type name.
-// Column names are lowercase because that is how PostgreSQL returns unquoted identifiers.
+// One row of the query in title.repository.ts: title_basic joined with its type name,
+// its rating and its genres. Column names are lowercase because that is how PostgreSQL
+// returns unquoted identifiers.
 export interface TitleRow {
   tconst: string;
   primarytitle: string;
@@ -13,6 +14,16 @@ export interface TitleRow {
   runtimeminutes: number | null;
   plot: string | null;
   poster_link: string | null;
+  // Both null when the title has no row in title_ratings, that is, no votes.
+  averagerating: number | null;
+  numvotes: number | null;
+  // Sorted by name, empty when the title has none.
+  genres: string[];
+}
+
+export interface TitleRatingDto {
+  average: number;
+  votes: number;
 }
 
 export interface TitleDto {
@@ -27,6 +38,9 @@ export interface TitleDto {
   runtimeMinutes: number | null;
   plot: string | null;
   posterUrl: string | null;
+  // Embedded: a title has a handful of genres and one rating (docs/api-design.md 2.4).
+  genres: string[];
+  rating: TitleRatingDto | null;
 }
 
 // One row of string_search(): just enough to list a title in search results.
