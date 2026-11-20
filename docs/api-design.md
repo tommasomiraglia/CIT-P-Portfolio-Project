@@ -191,6 +191,18 @@ Other fields are ignored.
 - A user deleted after logging in gets a `401` (4.3).
 - `update_user` treats `NULL` as "leave unchanged", so it has a parameter `p_clear_phonenumber` for removing the phone number (`database/CHANGES.md`).
 
+### 1.15 Deleting your user: `DELETE /api/users/:userId`
+
+- Deletes the account and all its data: bookmarks, ratings, search history and favourite genres.
+  The answer is `204` with no body.
+- "All its data" includes the user's votes in the averages.
+  `delete_user` removes the user's rows through `ON DELETE CASCADE`, but that would leave each vote counted in `title_ratings` and `name_ratings`.
+  So the service first calls `unrate` for each of the user's ratings, as `DELETE` of one rating does (1.10), and then `delete_user`.
+- All of it runs in one transaction (2-D.4): if any step fails, nothing is deleted and every vote is still counted.
+- The transaction first locks the user's row, as `PUT` and `DELETE` of a rating do.
+  A rating the same user saves at the same moment then either finishes before the ratings are read, or waits and then gets a `401`; it can never add a vote that the delete misses.
+- A token stays valid after the delete (4.3), so every later request with it gets a `401`, including a second `DELETE`.
+
 ## 2. JSON representations
 
 ### 2.1 Plain JSON with `url` fields

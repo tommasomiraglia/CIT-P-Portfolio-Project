@@ -15,7 +15,12 @@ import {
   removeAllSearchHistory,
   removeSearchHistoryEntry,
 } from '../services/search-history.service.js';
-import { getOwnUser, registerUser, updateOwnUser } from '../services/user.service.js';
+import {
+  deleteOwnUser,
+  getOwnUser,
+  registerUser,
+  updateOwnUser,
+} from '../services/user.service.js';
 import type { ProfileChanges, RegistrationInput } from '../types/user.js';
 
 // The rules of docs/api-design.md 4.5.
@@ -116,6 +121,15 @@ export async function patchUserById(
 ): Promise<void> {
   const userId = parseIntegerId('user id', req.params.userId);
   res.json(await updateOwnUser(userId, parseProfileChanges(readJsonObject(req.body))));
+}
+
+// DELETE /api/users/:userId: the account and everything that belongs to it. 204, no body.
+export async function deleteUserById(
+  req: Request<{ userId: string }>,
+  res: Response,
+): Promise<void> {
+  await deleteOwnUser(parseIntegerId('user id', req.params.userId));
+  res.status(204).end();
 }
 
 const POSITIVE_BIGINT = /^[1-9]\d*$/;

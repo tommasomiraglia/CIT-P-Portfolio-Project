@@ -75,3 +75,13 @@ export async function removeRating(
   ]);
   return result.rows[0]?.removed === true;
 }
+
+// The titles a user has rated, all of them: deleting the user has to take every vote out of
+// the averages, so this is not paged.
+export async function findRatedTitleIds(db: Queryable, userId: number): Promise<string[]> {
+  const result = await db.query<{ tconst: string }>(
+    'SELECT tconst FROM rating_history WHERE userid = $1 ORDER BY tconst',
+    [userId],
+  );
+  return result.rows.map((row) => row.tconst);
+}

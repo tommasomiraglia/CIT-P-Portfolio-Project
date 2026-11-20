@@ -5,6 +5,7 @@ import {
   deleteOwnGenre,
   deleteSearchHistory,
   deleteSearchHistoryEntry,
+  deleteUserById,
   getOwnGenre,
   getUserById,
   listOwnGenres,
@@ -27,6 +28,7 @@ userRouter.post('/', createUser);
 const ownUserRouter = Router({ mergeParams: true });
 ownUserRouter.get('/', getUserById);
 ownUserRouter.patch('/', patchUserById);
+ownUserRouter.delete('/', deleteUserById);
 ownUserRouter.get('/search-history', listSearchHistory);
 ownUserRouter.delete('/search-history', deleteSearchHistory);
 ownUserRouter.delete('/search-history/:entryId', deleteSearchHistoryEntry);

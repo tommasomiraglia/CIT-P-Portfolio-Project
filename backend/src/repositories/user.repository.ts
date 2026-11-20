@@ -100,6 +100,15 @@ export async function findUserById(db: Queryable, userId: number): Promise<UserR
   return result.rows[0];
 }
 
+// Deletes the user; ON DELETE CASCADE removes their bookmarks, ratings, history and genres.
+// Returns false when there was no such user.
+export async function deleteUser(db: Queryable, userId: number): Promise<boolean> {
+  const result = await db.query<{ deleted: boolean }>('SELECT delete_user($1) AS deleted', [
+    userId,
+  ]);
+  return result.rows[0]?.deleted === true;
+}
+
 export async function userExists(db: Queryable, userId: number): Promise<boolean> {
   const result = await db.query('SELECT 1 FROM app_user WHERE userid = $1', [userId]);
   return result.rowCount === 1;

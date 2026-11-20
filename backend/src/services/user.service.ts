@@ -5,10 +5,13 @@ import { withTransaction } from '../db/transaction.js';
 import { hashPassword } from '../lib/password.js';
 import { toUserDto } from '../mappers/user.mapper.js';
 import { ConflictError, UnauthorizedError } from '../middleware/errors.js';
+import { findRatedTitleIds, removeRating } from '../repositories/rating.repository.js';
 import {
   DuplicateUserError,
+  deleteUser,
   findUserById,
   insertUser,
+  lockUser,
   updateUser,
 } from '../repositories/user.repository.js';
 import type { ProfileChanges, RegistrationInput, UserDto } from '../types/user.js';
@@ -74,4 +77,26 @@ export async function updateOwnUser(userId: number, changes: ProfileChanges): Pr
     throw new UnauthorizedError('User no longer exists');
   }
   return toUserDto(row);
+}
+
+// Deletes the account and all its data (2-D.4: everything or nothing).
+// delete_user alone would leave the user's votes in title_ratings and name_ratings: ON DELETE
+// CASCADE removes the rating_history rows but does not recompute the averages. So every
+// rating is first removed through unrate(), as DELETE of one rating does.
+// The lock comes first, so that a rating the same user saves at the same moment either
+// finishes before the list is read, or waits and then finds the user gone (401).
+// A missing row means the user was already deleted: the token no longer names anyone (4.3).
+export async function deleteOwnUser(userId: number): Promise<void> {
+  await withTransaction(async (client) => {
+    if (!(await lockUser(client, userId))) {
+      throw new UnauthorizedError('User no longer exists');
+    }
+    for (const titleId of await findRatedTitleIds(client, userId)) {
+      await removeRating(client, userId, titleId);
+    }
+    if (!(await deleteUser(client, userId))) {
+      // Cannot happen while the user is locked. Throwing rolls the unrates back.
+      throw new Error(`User ${userId} was not there to delete after locking it`);
+    }
+  });
 }
