@@ -12,8 +12,8 @@ import type {
   PersonSummaryDto,
   PersonWordDto,
   PersonWordRow,
+  PopularActorDto,
   PopularActorRow,
-  PopularActorDto
 } from '../types/person.js';
 import { titleUrl } from './title.mapper.js';
 
@@ -57,7 +57,6 @@ export function toPopularActorDto(row: PopularActorRow): PopularActorDto {
     votes: row.votes,
   };
 }
-
 
 export function toPersonWordDto(row: PersonWordRow): PersonWordDto {
   return {

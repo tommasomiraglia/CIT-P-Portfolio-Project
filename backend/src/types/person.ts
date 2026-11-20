@@ -69,7 +69,6 @@ export interface PersonWordDto {
   frequency: number;
 }
 
-
 export interface PopularActorRow {
   nconst: string;
   primaryname: string;
