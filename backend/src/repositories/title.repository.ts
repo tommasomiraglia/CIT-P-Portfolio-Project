@@ -4,7 +4,13 @@ import type { Queryable } from '../db/transaction.js';
 import { toLimitOffset } from '../lib/paging.js';
 import type { PageRequest } from '../types/page.js';
 import type { PopularActorRow } from '../types/person.js';
-import type { SimilarTitleRow, TitleRow, TitleSearchRow } from '../types/title.js';
+import type {
+  RankedTitleRow,
+  SimilarTitleRow,
+  TitleFieldSearch,
+  TitleRow,
+  TitleSearchRow,
+} from '../types/title.js';
 
 // $1 is a placeholder: pg sends the id separately from the SQL text,
 // so a malicious id can never change the query (no SQL injection).
@@ -53,6 +59,70 @@ export async function searchTitlesByText(
   const result = await db.query<TitleSearchRow>(
     'SELECT tconst, primarytitle FROM string_search($1, $2, $3)',
     [query, limit, offset],
+  );
+  return result.rows;
+}
+
+// Titles that match every given field: title and plot by their text, characters and names
+// through the people of the title. A null field is not filtered on.
+export async function searchTitlesByFields(
+  db: Queryable,
+  fields: TitleFieldSearch,
+  pageRequest: PageRequest,
+): Promise<TitleSearchRow[]> {
+  const { limit, offset } = toLimitOffset(pageRequest);
+  const result = await db.query<TitleSearchRow>(
+    'SELECT tconst, primarytitle FROM structured_string_search($1, $2, $3, $4, $5, $6)',
+    [fields.title, fields.plot, fields.characters, fields.names, limit, offset],
+  );
+  return result.rows;
+}
+
+// The three word searches look the words up in the word index (table wi, and weights for
+// the ranked one) instead of scanning titles and plots. pg sends a JavaScript array as a
+// PostgreSQL array; ::text[] states its type.
+
+// Titles that contain every one of the words, ordered by title.
+export async function findTitlesWithAllWords(
+  db: Queryable,
+  words: string[],
+  pageRequest: PageRequest,
+): Promise<TitleSearchRow[]> {
+  const { limit, offset } = toLimitOffset(pageRequest);
+  const result = await db.query<TitleSearchRow>(
+    'SELECT tconst, primarytitle FROM exact_match_search($1::text[], $2, $3)',
+    [words, limit, offset],
+  );
+  return result.rows;
+}
+
+// Titles that contain at least one of the words, those with the most words first.
+// rank is BIGINT, which pg returns as a string; ::int makes it a number.
+export async function findTitlesWithAnyWord(
+  db: Queryable,
+  words: string[],
+  pageRequest: PageRequest,
+): Promise<RankedTitleRow[]> {
+  const { limit, offset } = toLimitOffset(pageRequest);
+  const result = await db.query<RankedTitleRow>(
+    'SELECT tconst, primarytitle, rank::int AS rank FROM any_match_search($1::text[], $2, $3)',
+    [words, limit, offset],
+  );
+  return result.rows;
+}
+
+// Titles that contain at least one of the words, ordered by the summed weight of those
+// words: a word counts for more when it is frequent in the title and rare in the index.
+// rank is NUMERIC, which pg returns as a string; ::float8 makes it a number.
+export async function findTitlesRankedByWords(
+  db: Queryable,
+  words: string[],
+  pageRequest: PageRequest,
+): Promise<RankedTitleRow[]> {
+  const { limit, offset } = toLimitOffset(pageRequest);
+  const result = await db.query<RankedTitleRow>(
+    'SELECT tconst, primarytitle, rank::float8 AS rank FROM weights_search($1::text[], $2, $3)',
+    [words, limit, offset],
   );
   return result.rows;
 }

@@ -7,6 +7,7 @@ import { genreRouter } from './genre.routes.js';
 import { personRouter } from './person.routes.js';
 import { titleRouter } from './title.routes.js';
 import { userRouter } from './user.routes.js';
+import { wordRouter } from './word.routes.js';
 
 export const apiRouter = Router();
 
@@ -16,3 +17,4 @@ apiRouter.use('/genres', genreRouter);
 apiRouter.use('/users', userRouter);
 apiRouter.use('/auth', authRouter);
 apiRouter.use('/people', personRouter);
+apiRouter.use('/words', wordRouter);

@@ -16,6 +16,7 @@ import type {
   PopularActorRow,
 } from '../types/person.js';
 import { titleUrl } from './title.mapper.js';
+import { toWordDto } from './word.mapper.js';
 
 export function personUrl(nconst: string): string {
   return `/api/people/${nconst}`;
@@ -58,12 +59,9 @@ export function toPopularActorDto(row: PopularActorRow): PopularActorDto {
   };
 }
 
+// A word of a person's titles is the same object as any other word in a list.
 export function toPersonWordDto(row: PersonWordRow): PersonWordDto {
-  return {
-    url: `/api/titles?words=${encodeURIComponent(row.word)}&match=any`,
-    word: row.word,
-    frequency: row.freq,
-  };
+  return toWordDto(row);
 }
 
 // Builds the person detail from the three query results (person, professions, known-for titles).

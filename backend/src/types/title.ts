@@ -66,3 +66,32 @@ export interface SimilarTitleRow {
 export interface SimilarTitleDto extends TitleSummaryDto {
   sharedGenres: number;
 }
+
+// The four fields of the structured search (docs/api-design.md 1.16). A field the client
+// left out is null, which structured_string_search treats as "do not filter on this".
+export interface TitleFieldSearch {
+  title: string | null;
+  plot: string | null;
+  characters: string | null;
+  names: string | null;
+}
+
+// How the word search combines its words: every word, at least one, or ranked by weight.
+export type WordMatch = 'exact' | 'any' | 'ranked';
+
+// One row of any_match_search() or weights_search(): a title and the number its function
+// orders by. For any_match_search that is how many of the words the title contains, for
+// weights_search the sum of the weights of the words it contains.
+export interface RankedTitleRow extends TitleSearchRow {
+  rank: number;
+}
+
+// A title found by match=any: a title in a list and how many of the words it contains.
+export interface WordMatchTitleDto extends TitleSummaryDto {
+  matchedWords: number;
+}
+
+// A title found by match=ranked: a title in a list and its score, higher is more relevant.
+export interface RankedTitleDto extends TitleSummaryDto {
+  relevance: number;
+}

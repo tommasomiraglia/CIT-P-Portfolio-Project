@@ -1,5 +1,7 @@
 // Converts a title row from the database into the TitleDto the API sends.
 import type {
+  RankedTitleDto,
+  RankedTitleRow,
   SimilarTitleDto,
   SimilarTitleRow,
   TitleDto,
@@ -7,6 +9,7 @@ import type {
   TitleRow,
   TitleSearchRow,
   TitleSummaryDto,
+  WordMatchTitleDto,
 } from '../types/title.js';
 
 // The OMDB import stores "N/A" (and sometimes an empty string) where a value is unknown.
@@ -61,4 +64,14 @@ export function toSimilarTitleDto(row: SimilarTitleRow): SimilarTitleDto {
     title: row.primarytitle,
     sharedGenres: row.freq,
   };
+}
+
+// One any_match_search row: rank is the number of the given words the title contains.
+export function toWordMatchTitleDto(row: RankedTitleRow): WordMatchTitleDto {
+  return { ...toTitleSummaryDto(row), matchedWords: row.rank };
+}
+
+// One weights_search row: rank is the summed weight of the given words in the title.
+export function toRankedTitleDto(row: RankedTitleRow): RankedTitleDto {
+  return { ...toTitleSummaryDto(row), relevance: row.rank };
 }
