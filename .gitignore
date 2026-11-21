@@ -6,3 +6,7 @@ dist/
 
 # Local secrets: never commit
 .env
+
+# Working notes on how endpoints were built: kept locally, not part of the repository
+docs/ratings-endpoints.md
+docs/title-searches-endpoints.md
