@@ -25,7 +25,6 @@ backend/            Subproject 2: the REST API (TypeScript, Express)
 docs/               Assignment and reports
   api-design.md     Decisions on URLs, JSON, paging and login
   user-stories.md   What the application lets people do, and the endpoints each story needs
-  ratings-endpoints.md  How the rating endpoints were built, and why
   report/           Draft sections of the Subproject 2 report
 ```
 
@@ -54,6 +53,7 @@ psql -h localhost -U postgres -d imdb -f .\database\D2_indexes.sql
 
 B2 drops the raw tables, so it only works on a freshly loaded database.
 When someone changes one of these scripts, rebuild your database from scratch in the same order.
+Running only `D1_functionality.sql` again is not enough: it recreates the `weights` table, which loses its index from `D2_indexes.sql` and the rights that `G1_app_role.sql` granted on it, so `GET /api/titles?words=…&match=ranked` becomes slow or fails until both are run again.
 What changed since Subproject 1 is in `database/CHANGES.md`.
 
 `database/F1_test.sql` tests the functions.
@@ -143,6 +143,10 @@ Files ending in `.api.test.ts`, and `api.test.ts`, send real HTTP requests to th
 | `GET /api/health` | `200 {"status":"ok"}`, or `503` if the database does not answer |
 | `GET /api/titles/:id` | `200` with the title, its genres and its rating, `400` if `:id` is not a title id like `tt0052520`, `404` if no title has that id |
 | `GET /api/titles?search=…` | `200` with one page of matching titles (`page`, `pageSize`), `400` for a missing or invalid parameter; saved to the history when a token is sent |
+| `GET /api/titles?title=…&plot=…&characters=…&names=…` | `200` with one page of titles that match every given field, `400` if no field has text; saved to the history when a token is sent |
+| `GET /api/titles?words=a,b&match=exact\|any\|ranked` | `200` with one page of titles that contain all of the words (`exact`), any of them (`any`) or ordered by relevance (`ranked`, the default), `400` for invalid `words` or `match` |
+| `GET /api/titles` with parameters of two searches | `400`: one request uses one kind of search |
+| `GET /api/words?words=a,b` | `200` with one page of the words that occur most often with the given ones, `400` for invalid `words` |
 | `GET /api/people?name=…` | `200` with one page of people whose name contains the text, `400` for a missing or invalid parameter; saved to the history when a token is sent |
 | `GET /api/people/:id` | `200` with the person, `400` if `:id` is not a person id like `nm0000138`, `404` if no person has that id |
 | `GET /api/people/:id/co-players` | `200` with one page of the people who acted with them most often, `400` or `404` as above |
