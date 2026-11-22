@@ -536,7 +536,7 @@ The answer is `201`, with the header `Location: /api/users/7` and the user:
 ```
 
 `GET /api/users/:userId` and the `user` field of the login answer use the same representation.
-`langid` and `regionid` from the database are not part of it yet: there are no language or region resources for them to link to (2.4).
+`langid` and `regionid` from the database are not part of it: the group dropped the language and region preferences (user story L1), so there are no language or region resources for them to link to (2.4).
 
 **Why these rules:**
 

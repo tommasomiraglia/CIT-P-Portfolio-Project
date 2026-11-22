@@ -56,6 +56,11 @@ When someone changes one of these scripts, rebuild your database from scratch in
 Running only `D1_functionality.sql` again is not enough: it recreates the `weights` table, which loses its index from `D2_indexes.sql` and the rights that `G1_app_role.sql` granted on it, so `GET /api/titles?words=…&match=ranked` becomes slow or fails until both are run again.
 What changed since Subproject 1 is in `database/CHANGES.md`.
 
+On the course server, also run `database/G1_app_role.sql` once, as `cit16`.
+It creates `cit16_app`, a role that can read the IMDB data, write the framework data and call the functions, but cannot change the schema.
+The backend connects as that role; the comment at the top of the script says how.
+A local database does not need it.
+
 `database/F1_test.sql` tests the functions.
 It runs in one transaction that it rolls back, so it leaves no rows behind, and it stops with `FAIL: ...` when a check fails.
 To regenerate its output, use `cmd /c` so the file stays UTF-8 (PowerShell's `>` writes UTF-16):
@@ -81,6 +86,10 @@ node -e "console.log(require('crypto').randomBytes(32).toString('base64url'))"
 
 Paste the output after `JWT_SECRET=` in `.env`.
 The API refuses to start without it.
+
+`DB_SSL` and `DB_SSL_VERIFY` in `.env` control the encryption (TLS) of the connection to the database.
+Leave `DB_SSL=false` for a PostgreSQL on your own machine, and set `DB_SSL=true` for the course server.
+`DB_SSL_VERIFY=true` also checks the server's certificate; set it to `false` only while that certificate is expired.
 
 `PORT` in `.env` sets the port of the API. It is optional and defaults to 3000.
 `CORS_ORIGINS` lists the web pages allowed to call the API from a browser, separated by commas.

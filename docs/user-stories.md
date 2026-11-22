@@ -32,10 +32,10 @@ A user can do everything a visitor can.
 | Id | Story | Endpoints | Status |
 | --- | --- | --- | --- |
 | T1 | As a visitor, I want a title page with poster, plot, year, runtime, genres and rating, so that I can decide whether to watch it. | `GET /api/titles/:id` | Built, with genres and rating (api-design.md 2.6) |
-| T2 | As a visitor, I want to see the most popular actors of a title, so that I know who is in it. | `GET /api/titles/:id/actors` | To build |
-| T3 | As a visitor, I want to see titles similar to the one I am looking at, so that I can find something else I might like. | `GET /api/titles/:id/similar` | To build |
-| T4 | As a visitor, I want to see the alternative titles of a title, so that I can recognise a movie by the name it has in my country. | **new** `GET /api/titles/:id/alternative-titles` | Not designed |
-| T5 | As a visitor, I want to see the episodes of a series, so that I can browse it season by season. | **new** `GET /api/titles/:id/episodes` | Not designed |
+| T2 | As a visitor, I want to see the most popular actors of a title, so that I know who is in it. | `GET /api/titles/:id/actors` | Built (api-design.md 1.5) |
+| T3 | As a visitor, I want to see titles similar to the one I am looking at, so that I can find something else I might like. | `GET /api/titles/:id/similar` | Built (api-design.md 1.5) |
+| T4 | As a visitor, I want to see the alternative titles of a title, so that I can recognise a movie by the name it has in my country. | None | Dropped (see below) |
+| T5 | As a visitor, I want to see the episodes of a series, so that I can browse it season by season. | None | Dropped (see below) |
 | P1 | As a visitor, I want a person page with their professions, rating and the titles they are known for, so that I can see who they are. | `GET /api/people/:id` | Built (api-design.md 1.9) |
 | P2 | As a visitor, I want to see the actors a person has worked with most often, so that I can discover related people. | `GET /api/people/:id/co-players` | Built (api-design.md 1.9) |
 | P3 | As a visitor, I want to see the words most typical of a person's titles, so that I get a quick idea of what their work is about. | `GET /api/people/:id/words` | Built (api-design.md 1.9) |
@@ -78,7 +78,7 @@ A user can do everything a visitor can.
 | H3 | As a user, I want to delete one search or my whole history, so that I control what is kept about me. | `DELETE .../search-history/:entryId`, `DELETE .../search-history` | Built (api-design.md 1.12) |
 | G1 | As a user, I want to choose my favourite genres from the list of all genres, so that the application knows what I like. | **new** `GET /api/genres`, and `PUT`, `DELETE /api/users/:userId/genres/:genreId` | Built (api-design.md 1.11) |
 | G2 | As a user, I want to see my favourite genres, so that I can check and change them. | `GET /api/users/:userId/genres` | Built (api-design.md 1.11) |
-| L1 | As a user, I want to set my preferred language and region, so that alternative titles in my language can be shown first. | Not in the API (api-design.md 4.5 leaves `langid` and `regionid` out) | Group decision, see below |
+| L1 | As a user, I want to set my preferred language and region, so that alternative titles in my language can be shown first. | None | Dropped (see below) |
 
 ## Operations beyond 2-A.1
 
@@ -88,8 +88,6 @@ Each is justified by the stories that need it.
 | Operation | Needed by | Why it is worth adding |
 | --- | --- | --- |
 | Genres and rating in `GET /api/titles/:id` | T1 | The title page of the Subproject 1 design shows them, and both are small and bounded, so they can be embedded (api-design.md 2.4). |
-| `GET /api/titles/:id/alternative-titles` | T4, L1 | The Subproject 1 design lists alternative titles on the title page; a title can have dozens, so it is a paged sub-resource rather than an embedded list. |
-| `GET /api/titles/:id/episodes` | T5 | Series are titles too; without this a series page has no way to reach its episodes. The index on `title_episode(parentconst)` from Subproject 1 already serves this query. |
 | `GET /api/genres` | G1 | The frontend needs the list of genres to offer them as choices. |
 | `GET /api/users/:userId/ratings/:titleId` | R3 | Without it, the title page would have to page through the whole rating list to find one rating. |
 | `GET .../bookmarks/titles/:titleId` and `.../people/:personId` | B3 | Same reason as R3, for the bookmark button. |
@@ -107,9 +105,11 @@ Each is justified by the stories that need it.
    The Subproject 1 design links a history entry to the titles and people it found (`history_title_basic`, `history_name_basic`), so past results can be reopened.
    The API only saves the search text.
    The simpler choice is to give each history entry a `url` that runs the search again; the alternative is to save every result, which costs one insert per result on every search.
-4. **Language and region preferences (L1).**
-   Either add `GET /api/languages` and `GET /api/regions` and accept `langId` and `regionId` in the user, or drop the story.
-   It only pays off together with T4.
-5. **Which "new" operations to build at all.**
+4. **Language and region preferences (L1).** Resolved: dropped.
+   A preferred language and region would only decide which alternative title to show first, so without T4 they have no effect.
+   The assignment does not ask for them, and `langid` and `regionid` stay out of the user (api-design.md 4.5).
+5. **Which "new" operations to build at all.** Resolved.
    R3, B3 and `GET /api/genres` are built, because the frontend could not show a correct title page or preferences screen without them.
-   T4 and T5 are each small too, but every one is more code, tests and report.
+   T4 (alternative titles) and T5 (episodes) are dropped.
+   No requirement of the assignment needs them, and the application is complete without them: a title page still shows the title, its plot, genres, rating, actors and similar titles.
+   Each would be more code, tests and report for a story that is nice to have.

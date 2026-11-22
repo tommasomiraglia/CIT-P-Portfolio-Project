@@ -1,8 +1,8 @@
 <!--
 Notes for the group, delete before handing in:
 - This is section 2-B.3 of the Subproject 2 report. It points to sections 2-B.1 and 2-B.2 as "the resource model" and "the representations"; adjust the references once those sections exist in the report.
-- Part 1 describes the design. Some endpoints are designed but not built yet (see docs/user-stories.md, "Status"). Before handing in, check that every claim still matches the code.
-- 2-A.4 asks for a database role with minimal privileges. That is not part of the interface and is not done yet; the sentence about it below must be true by the hand-in.
+- Part 1 describes the design. Every endpoint it names is built (see docs/user-stories.md, "Status"). Before handing in, check that every claim still matches the code.
+- 2-A.4 asks for a database role with minimal privileges. database/G1_app_role.sql creates it (cit16_app); the sentence about it below holds once the backend connects as that role.
 -->
 
 # Design rationale
@@ -81,8 +81,6 @@ The stories that need more led to these operations:
 | Operation | Story | Why |
 | --- | --- | --- |
 | Genres and rating in a title | Title page | Shown on the title page; small and bounded, so embedded. |
-| `GET /api/titles/:id/alternative-titles` | Alternative titles | A title can have dozens, so a paged sub-resource. |
-| `GET /api/titles/:id/episodes` | Episodes of a series | Otherwise a series page cannot reach its episodes. |
 | `GET /api/genres` | Choosing favourite genres | The client needs the list of genres to offer. |
 | `GET /api/users/:userId/ratings/:titleId` | Own rating on a title page | Without it, the client must page through every rating to find one. |
 | `GET .../bookmarks/titles/:titleId` and `.../bookmarks/people/:personId` | Bookmark button | Same reason, for the state of the bookmark button. |
