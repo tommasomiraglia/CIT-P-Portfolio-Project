@@ -21,17 +21,17 @@ A user can do everything a visitor can.
 | Id | Story | Endpoints | Status |
 | --- | --- | --- | --- |
 | S1 | As a visitor, I want to search titles by a word from their name or plot, so that I can find a movie without knowing its exact title. | `GET /api/titles?search=` | Built |
-| S2 | As a visitor, I want to search by title, plot, character and actor at the same time, so that I can find a movie I only half remember ("the one where Ledger plays the Joker"). | `GET /api/titles?title=&plot=&characters=&names=` | To build |
+| S2 | As a visitor, I want to search by title, plot, character and actor at the same time, so that I can find a movie I only half remember ("the one where Ledger plays the Joker"). | `GET /api/titles?title=&plot=&characters=&names=` | Built (api-design.md 1.16) |
 | S3 | As a visitor, I want to search for people by name, so that I can open the page of an actor or director. | `GET /api/people?name=` | Built (api-design.md 1.8) |
-| S4 | As a visitor, I want to search with several keywords and choose whether titles must contain all of them, any of them, or be ranked by how well they match, so that I can widen or narrow my results. | `GET /api/titles?words=&match=exact\|any\|ranked` | To build |
-| S5 | As a visitor, I want to see which words often appear together with my keywords, so that I can find better words to search with. | `GET /api/words?words=` | To build |
+| S4 | As a visitor, I want to search with several keywords and choose whether titles must contain all of them, any of them, or be ranked by how well they match, so that I can widen or narrow my results. | `GET /api/titles?words=&match=exact\|any\|ranked` | Built (api-design.md 1.17) |
+| S5 | As a visitor, I want to see which words often appear together with my keywords, so that I can find better words to search with. | `GET /api/words?words=` | Built (api-design.md 1.17) |
 | S6 | As a visitor, I want long result lists split into pages that I can move through, so that the application stays fast and I am not flooded with results. | `?page=&pageSize=` on every list | Built for every list that exists (api-design.md 3) |
 
 ## Titles and people
 
 | Id | Story | Endpoints | Status |
 | --- | --- | --- | --- |
-| T1 | As a visitor, I want a title page with poster, plot, year, runtime, genres and rating, so that I can decide whether to watch it. | `GET /api/titles/:id` | Built, but without genres and rating (see "Gaps" below) |
+| T1 | As a visitor, I want a title page with poster, plot, year, runtime, genres and rating, so that I can decide whether to watch it. | `GET /api/titles/:id` | Built, with genres and rating (api-design.md 2.6) |
 | T2 | As a visitor, I want to see the most popular actors of a title, so that I know who is in it. | `GET /api/titles/:id/actors` | To build |
 | T3 | As a visitor, I want to see titles similar to the one I am looking at, so that I can find something else I might like. | `GET /api/titles/:id/similar` | To build |
 | T4 | As a visitor, I want to see the alternative titles of a title, so that I can recognise a movie by the name it has in my country. | **new** `GET /api/titles/:id/alternative-titles` | Not designed |
@@ -47,8 +47,8 @@ A user can do everything a visitor can.
 | A1 | As a visitor, I want to register with a username, email and password, so that I can save ratings, bookmarks and searches. | `POST /api/users` | Built |
 | A2 | As a user, I want to log in, so that the application knows my data is mine. | `POST /api/auth/login` | Built |
 | A3 | As a user, I want to log out, so that nobody else on this computer can use my account. | None: the frontend deletes its token (api-design.md 4.3) | Nothing to build |
-| A4 | As a user, I want to see and change my profile, so that my email and phone number stay up to date. | `GET`, `PATCH /api/users/:userId` | `GET` built, `PATCH` to build |
-| A5 | As a user, I want to delete my account and all my data, so that I can leave the application. | `DELETE /api/users/:userId` | To build |
+| A4 | As a user, I want to see and change my profile, so that my email and phone number stay up to date. | `GET`, `PATCH /api/users/:userId` | Built (api-design.md 1.14) |
+| A5 | As a user, I want to delete my account and all my data, so that I can leave the application. | `DELETE /api/users/:userId` | Built (api-design.md 1.15) |
 
 ## Ratings
 
@@ -73,7 +73,7 @@ A user can do everything a visitor can.
 
 | Id | Story | Endpoints | Status |
 | --- | --- | --- | --- |
-| H1 | As a user, I want my searches saved automatically, so that I do not have to remember them. | Done by the searches when a token is sent | Built for S1 |
+| H1 | As a user, I want my searches saved automatically, so that I do not have to remember them. | Done by the searches when a token is sent | Built for S1, S2 and S3; the word search S4 is not saved (api-design.md 1.17) |
 | H2 | As a user, I want to see my past searches, newest first, and run one again with one click, so that I can return to earlier results. | `GET /api/users/:userId/search-history` | Built (api-design.md 1.12) |
 | H3 | As a user, I want to delete one search or my whole history, so that I control what is kept about me. | `DELETE .../search-history/:entryId`, `DELETE .../search-history` | Built (api-design.md 1.12) |
 | G1 | As a user, I want to choose my favourite genres from the list of all genres, so that the application knows what I like. | **new** `GET /api/genres`, and `PUT`, `DELETE /api/users/:userId/genres/:genreId` | Built (api-design.md 1.11) |
@@ -98,8 +98,8 @@ Each is justified by the stories that need it.
 
 ## Gaps and decisions for the group
 
-1. **The title page lacks genres and rating (T1).**
-   `GET /api/titles/:id` returns neither yet, though the Subproject 1 design shows both.
+1. **The title page lacks genres and rating (T1).** Resolved.
+   `GET /api/titles/:id` now embeds both, as the Subproject 1 design shows them (api-design.md 2.6).
 2. **Search results are sorted alphabetically, not by relevance (S1).**
    `string_search` orders by title, so searching "twilight zone" lists episodes such as "A Season to Wither" before the series "The Twilight Zone" itself.
    Ordering title matches before plot matches, or by number of votes, would put the expected result first; it is a change to `D1_functionality.sql`.

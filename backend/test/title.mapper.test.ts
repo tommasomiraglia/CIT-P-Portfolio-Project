@@ -13,6 +13,9 @@ const row: TitleRow = {
   runtimeminutes: 50,
   plot: 'A plot.',
   poster_link: 'https://example.com/poster.jpg',
+  averagerating: 8.9,
+  numvotes: 92000,
+  genres: ['Drama', 'Fantasy'],
 };
 
 describe('toTitleDto', () => {
@@ -28,7 +31,15 @@ describe('toTitleDto', () => {
       runtimeMinutes: 50,
       plot: 'A plot.',
       posterUrl: 'https://example.com/poster.jpg',
+      genres: ['Drama', 'Fantasy'],
+      rating: { average: 8.9, votes: 92000 },
     });
+  });
+
+  test('gives a title with no votes and no genres a null rating and an empty list', () => {
+    const dto = toTitleDto({ ...row, averagerating: null, numvotes: null, genres: [] });
+    expect(dto.rating).toBeNull();
+    expect(dto.genres).toEqual([]);
   });
 
   test('turns the "N/A" and empty-string placeholders into null', () => {

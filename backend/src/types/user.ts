@@ -22,6 +22,14 @@ export interface RegistrationInput {
   phoneNumber: string | null;
 }
 
+// The body of PATCH /api/users/:userId after the controller validated it. A missing field
+// stays as it is; phoneNumber null removes the phone number.
+export interface ProfileChanges {
+  username?: string;
+  email?: string;
+  phoneNumber?: string | null;
+}
+
 // A registration that passed validation, with the password already hashed.
 export interface NewUser {
   username: string;

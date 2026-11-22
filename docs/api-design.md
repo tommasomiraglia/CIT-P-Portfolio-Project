@@ -46,7 +46,7 @@ Ids are validated before use (2-D.2): titles match `tt` plus 7 or 8 digits, peop
 | --- | --- | --- |
 | `GET /api/titles?search=…` | `string_search` | Optional: a logged-in search is saved to the history |
 | `GET /api/titles?title=…&plot=…&characters=…&names=…` | `structured_string_search` | Optional, as above |
-| `GET /api/titles?words=a,b&match=exact\|any\|ranked` | `exact_match_search`, `any_match_search`, `weights_search` | None |
+| `GET /api/titles?words=a,b&match=exact\|any\|ranked` | `exact_match_search`, `any_match_search`, `weights_search` | None: not saved to the history (1.17) |
 | `GET /api/titles/:id` | - | None |
 | `GET /api/genres` | - (reads the `generes` table) | None |
 | `GET /api/genres/:genreId` | - (reads the `generes` table) | None |
@@ -75,7 +75,9 @@ Ids are validated before use (2-D.2): titles match `tt` plus 7 or 8 digits, peop
 | `GET /api/users/:userId/genres/:genreId` | - | Same user |
 | `PUT`, `DELETE /api/users/:userId/genres/:genreId` | `add_genre_preference`, `remove_genre_preference` | Same user |
 
-Combining `search`, the structured parameters and `words` in one request is a `400`.
+`GET /api/titles` is one collection with three ways to search it, and a request uses exactly one.
+Combining `search`, the structured parameters and `words` (or `match`) in one request is a `400`, and so is a request with none of them.
+Which search is meant is decided by the parameters that are present, also when one is empty: `?search=zone&title=` is a `400`.
 
 ### 1.6 Methods and status codes
 
@@ -94,8 +96,8 @@ Errors: `400` invalid parameter or body, `401` missing or invalid token, `403` t
 
 ### 1.7 Title search: `GET /api/titles?search=`
 
-- `search` is required here, trimmed, and 1 to 200 characters; anything else is a `400`.
-  The structured and word searches of 1.5 will add their own parameters to the same collection.
+- `search` is trimmed, and 1 to 200 characters; anything else is a `400`.
+  The structured search (1.16) and the word search (1.17) use other parameters of the same collection.
 - It matches titles whose title or plot contains the text, ignoring case.
 - A logged-in search (a valid token is sent) is saved to the user's history, an anonymous one is not.
   Only the request for page 1 is saved: following `next` is still the same search.
@@ -170,6 +172,78 @@ Other fields are ignored.
   They exist so that a title or person page can show whether the bookmark button is on without paging through the whole list.
 - A user deleted after logging in gets a `401` on every bookmark route (4.3), never an empty list, a `404` or a `500`.
 
+### 1.14 Changing your user: `PATCH /api/users/:userId`
+
+`PATCH` takes a JSON body with any of these fields; each follows the rule of registration (4.5):
+
+| Field | Rule |
+| --- | --- |
+| `username` | 3 to 30 characters: letters, digits, `_`, `.` and `-`. `null` is a `400`. |
+| `email` | An email address, at most 254 characters, stored in lowercase. `null` is a `400`. |
+| `phoneNumber` | Up to 30 digits, spaces, `+`, `-`, `(` and `)`, or `null` to remove the number. |
+
+- A field that is not sent stays as it is; other fields are ignored, as in registration.
+  The password cannot be changed here.
+- A body without any of the three fields is a `400`.
+  An invalid field is a `400` that names it, and then nothing is changed, also when other fields were valid.
+- A username or email that another user has is a `409` that says which one.
+  The database's `UNIQUE` constraints decide this, not a check before the update, so two users who claim the same value at the same moment get one `200` and one `409`, never a `500`.
+- The answer is `200` with the updated user, the same representation as `GET` (4.5).
+  The update and the read run in one transaction, so the answer shows exactly this change.
+- A user deleted after logging in gets a `401` (4.3).
+- `update_user` treats `NULL` as "leave unchanged", so it has a parameter `p_clear_phonenumber` for removing the phone number (`database/CHANGES.md`).
+
+### 1.15 Deleting your user: `DELETE /api/users/:userId`
+
+- Deletes the account and all its data: bookmarks, ratings, search history and favourite genres.
+  The answer is `204` with no body.
+- "All its data" includes the user's votes in the averages.
+  `delete_user` removes the user's rows through `ON DELETE CASCADE`, but that would leave each vote counted in `title_ratings` and `name_ratings`.
+  So the service first calls `unrate` for each of the user's ratings, as `DELETE` of one rating does (1.10), and then `delete_user`.
+- All of it runs in one transaction (2-D.4): if any step fails, nothing is deleted and every vote is still counted.
+- The transaction first locks the user's row, as `PUT` and `DELETE` of a rating do.
+  A rating the same user saves at the same moment then either finishes before the ratings are read, or waits and then gets a `401`; it can never add a vote that the delete misses.
+- A token stays valid after the delete (4.3), so every later request with it gets a `401`, including a second `DELETE`.
+
+### 1.16 Structured search: `GET /api/titles?title=&plot=&characters=&names=`
+
+- Each of the four fields is optional, trimmed, and at most 200 characters.
+  An empty field counts as not given, because a search form sends all four: `?title=batman&plot=&characters=&names=`.
+- At least one field must have text; otherwise the request is a `400`.
+  `structured_string_search` would return nothing for it, and the client could not tell an empty form from a search without matches.
+- A title must match every field that is given (`AND`), ignoring case: `title` and `plot` by the text of the title, `names` and `characters` through the people of the title.
+- Results are ordered by title, like the text search.
+- History and tokens work as in the text search (1.7).
+  The history stores one text per search, so the fields are saved as `title:batman characters:joker`, the form Subproject 1 used, without the fields that were not given.
+
+### 1.17 Word search and related words: `GET /api/titles?words=` and `GET /api/words?words=`
+
+Both take the same `words` parameter and read the word index (`wi`), not the text of the titles.
+
+| Parameter | Rule |
+| --- | --- |
+| `words` | Required. 1 to 10 words separated by commas, each at most 60 characters and without spaces. Words are trimmed, repeated words count once, and the letters A to Z are lowered, as the index stores them. |
+| `match` | Only for `/api/titles`. `exact`, `any` or `ranked`; missing means `ranked`. |
+
+| `match` | Database function | Finds | Order |
+| --- | --- | --- | --- |
+| `exact` | `exact_match_search` | Titles that contain every word | By title |
+| `any` | `any_match_search` | Titles that contain at least one word | Most words first, then by title |
+| `ranked` | `weights_search` | Titles that contain at least one word | By relevance, highest first |
+
+- Relevance is the sum of the weights of the words in the title; a word weighs more when it is frequent in the title and rare in the whole index.
+  `ranked` is the default because it puts the titles that are most about the words first.
+- `GET /api/words?words=a,b` lists the words that occur most often in the titles containing any of the given words, most frequent first, without the given words themselves (`words_query`).
+  It helps a user find better words to search with.
+- A word that is in no title is not an error: the answer is an empty page.
+- The word search is not saved to the history, with or without a token.
+  Subproject 1 only recorded the text, structured and name searches, and a keyword query is a refinement tool, not something a user returns to.
+  A token that is sent must still be valid (4.4), because the route is the same as for the other title searches.
+- Words are matched exactly, not as part of a longer word: `zone` does not find `zones`.
+
+**Limitation:** when the index was built, only the letters A to Z were lowered, so `Élisabeth` is stored with its capital.
+The API lowers the same letters and no others, so `Élisabeth` finds it and `élisabeth` does not.
+
 ## 2. JSON representations
 
 ### 2.1 Plain JSON with `url` fields
@@ -222,7 +296,7 @@ Messages never contain SQL, table names or stack traces (2-A.4).
 
 The client follows `url` for the full person.
 
-**Title in a list** (the items of `GET /api/titles?search=`):
+**Title in a list** (the items of every search on `GET /api/titles`):
 
 | Field | Type | Meaning |
 | --- | --- | --- |
@@ -231,6 +305,28 @@ The client follows `url` for the full person.
 | `title` | string | Primary title |
 
 The client follows `url` for the full title.
+Two word searches (1.17) add the number they are ordered by:
+`match=any` adds `matchedWords` (integer), how many of the given words the title contains, and `match=ranked` adds `relevance` (number), where higher is more relevant.
+
+**Title** (`GET /api/titles/:id`):
+
+| Field | Type | Meaning |
+| --- | --- | --- |
+| `url` | string | URI of the title, `/api/titles/:id` |
+| `id` | string | IMDB id, for example `tt0052520` |
+| `title` | string | Primary title |
+| `type` | string or `null` | Title type, for example `movie` or `tvSeries` |
+| `isAdult` | boolean or `null` | |
+| `startYear` | integer or `null` | Release year, or the first year of a series |
+| `endYear` | integer or `null` | Last year of a series, `null` for other titles and running series |
+| `runtimeMinutes` | integer or `null` | |
+| `plot` | string or `null` | |
+| `posterUrl` | string or `null` | Address of the poster image |
+| `genres` | string[] | Genre names, sorted by name, `[]` when the title has none. Embedded: a title has a handful at most (2.4) |
+| `rating` | object or `null` | `{ "average": 8.9, "votes": 92000 }`: the average rating (a number with one decimal) and the number of votes (integer), `null` when nobody has voted |
+
+The rating is the IMDB rating plus the votes of our users, which `PUT` and `DELETE` of 1.10 change.
+Similar titles and actors can be long lists, so they are not fields: they are the paged sub-resources `/api/titles/:id/similar` and `/api/titles/:id/actors` (2.4).
 
 **Rating** (`GET` and `PUT /api/users/:userId/ratings/:titleId`, and the items of `GET /api/users/:userId/ratings`):
 
@@ -290,16 +386,24 @@ The client follows `url` for the full title.
 **Co-player in a list** (the items of `GET /api/people/:id/co-players`):
 the fields of a person in a list, plus `sharedTitles` (integer), the number of titles the two acted in together.
 
-**Word in a list** (the items of `GET /api/people/:id/words`):
+**Word in a list** (the items of `GET /api/people/:id/words` and `GET /api/words?words=`):
 
 | Field | Type | Meaning |
 | --- | --- | --- |
 | `url` | string | Title search for the word, `/api/titles?words=<word>&match=any` |
-| `word` | string | A word from the person's titles |
+| `word` | string | A word from the word index |
 | `frequency` | integer | How often the word occurs |
 
-A word is not a resource of its own, so its `url` leads to the titles that contain it.
-That link works once the word search of 1.5 is implemented.
+A word is not a resource of its own, so its `url` leads to the titles that contain it (1.17).
+
+**Similar title in a list** (the items of `GET /api/titles/:id/similar`):
+the fields of a title in a list, plus `sharedGenres` (integer), the number of genres it shares with the title.
+Only titles of the same type are compared. Ordered by `sharedGenres`, then by number of votes, highest first.
+
+**Actor in a list** (the items of `GET /api/titles/:id/actors`):
+the fields of a person in a list, plus `rating` (number) and `votes` (integer).
+These are the actor's own rating over all their titles, not a rating of this role.
+Actors without a rating are left out. Ordered by `rating`, then by `votes`, highest first.
 
 **User**: see 4.5.
 

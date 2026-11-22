@@ -5,10 +5,12 @@ import {
   deleteOwnGenre,
   deleteSearchHistory,
   deleteSearchHistoryEntry,
+  deleteUserById,
   getOwnGenre,
   getUserById,
   listOwnGenres,
   listSearchHistory,
+  patchUserById,
   putOwnGenre,
 } from '../controllers/user.controller.js';
 import { authenticate, authorizeSelf } from '../middleware/auth.js';
@@ -25,6 +27,8 @@ userRouter.post('/', createUser);
 // mergeParams lets the routes below read :userId from the path above.
 const ownUserRouter = Router({ mergeParams: true });
 ownUserRouter.get('/', getUserById);
+ownUserRouter.patch('/', patchUserById);
+ownUserRouter.delete('/', deleteUserById);
 ownUserRouter.get('/search-history', listSearchHistory);
 ownUserRouter.delete('/search-history', deleteSearchHistory);
 ownUserRouter.delete('/search-history/:entryId', deleteSearchHistoryEntry);

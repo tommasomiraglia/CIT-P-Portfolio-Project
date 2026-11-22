@@ -91,7 +91,7 @@ describe('GET /api/titles?search=', () => {
   });
 
   test.each([
-    ['no search parameter', '', 'needs a "search" query parameter'],
+    ['no search parameter', '', 'Searching titles needs "search"'],
     ['an empty search', 'search=', '"search" must be given once'],
     ['a search of only spaces', 'search=%20%20', '"search" must be given once'],
     ['a repeated search', 'search=a&search=b', '"search" must be given once'],
