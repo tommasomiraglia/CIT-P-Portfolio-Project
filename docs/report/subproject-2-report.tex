@@ -1,0 +1,459 @@
+\documentclass[11pt,a4paper]{article}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[a4paper,margin=2.5cm]{geometry}
+\usepackage{array,graphicx,booktabs,tabularx,xcolor,caption,float,fancyhdr,titlesec,tocloft}
+\usepackage[colorlinks=true,linkcolor=black,urlcolor=blue]{hyperref}
+
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{0.6em}
+\pagestyle{fancy}\fancyhf{}\fancyfoot[C]{\thepage}
+\renewcommand{\headrulewidth}{0pt}
+
+\renewcommand{\cftsecfont}{\bfseries}
+\renewcommand{\cftsecpagefont}{\bfseries}
+\setlength{\cftbeforesecskip}{0.3em}
+\setlength{\cftbeforesubsecskip}{0pt}
+\setlength{\cftsubsecindent}{2em}
+\renewcommand{\cftdotsep}{2}
+\renewcommand{\contentsname}{\Huge\bfseries Contents}
+\setlength{\cftaftertoctitleskip}{0.8em}
+\titlespacing*{\section}{0pt}{2em}{1em}
+
+% \tb prints its argument as code, exactly as written: _ $ & and <> need no escaping.
+\newcommand{\tb}[1]{\texttt{\detokenize{#1}}}
+\emergencystretch=3em
+
+\begin{document}
+
+\begin{titlepage}
+\thispagestyle{empty}
+\centering
+\vspace*{3cm}
+{\large\scshape Roskilde University\par}
+\vspace{0.4cm}
+{\large Complex IT Systems -- Practice\par}
+\vspace{3cm}
+\rule{0.8\textwidth}{0.6pt}\par
+\vspace{1cm}
+{\Huge\bfseries CIT/P Portfolio Project\par}
+\vspace{0.6cm}
+{\LARGE Subproject 2\par}
+\vspace{0.8cm}
+{\Large The backend\par}
+\vspace{1cm}
+\rule{0.8\textwidth}{0.6pt}\par
+\vfill
+{\Large\bfseries Group 16\par}
+\vspace{0.8cm}
+{\large
+\begin{tabular}{cc}
+Frank Tongwa Asongna & Georgii Yakovlyev \\[0.4em]
+Tommaso Cosimo Miraglia & Anders Zobbe Mortensen
+\end{tabular}\par}
+\vspace{1.5cm}
+{\large \today\par}
+\vspace*{2cm}
+\end{titlepage}
+
+\pagenumbering{roman}
+\tableofcontents
+\clearpage
+\pagenumbering{arabic}
+
+\section*{Introduction}
+\addcontentsline{toc}{section}{Introduction}
+The backend is a RESTful web service that makes the database of Subproject~1 available to the frontend over HTTP. It is written in TypeScript, runs on Node.js~24 with the web framework Express~5, and connects to PostgreSQL through the driver \tb{pg}. Apart from a few single-row reads, it only calls the PostgreSQL functions of Subproject~1, so the business rules on the data stay in the database. The code is in \tb{backend/}, and the decisions behind the interface are recorded in more detail in \tb{docs/api-design.md}. The sections follow the structure of the assignment: requirements (2-A), API design (2-B), architecture (2-C), implementation (2-D) and testing (2-E).
+
+\section{Requirements}\label{sec:req}
+\subsection{Functionality}
+Every function of Subproject~1 that a client needs is reachable through one endpoint, listed with the function it calls in Table~\ref{tab:endpoints} (Section~\ref{sec:api}). The IMDb data is read-only: titles, people, words and genres only have \tb{GET} routes, and any other method on them is answered \tb{404} like a route that does not exist. The framework data supports create, read, update and delete as far as each operation has a meaning (Table~\ref{tab:crud}). A bookmark and a genre preference hold nothing besides the pair they connect, so there is nothing to update. A history entry records what the user searched, and changing it would make the history untrue, so it can only be deleted.
+
+\begin{table}[H]
+\centering\small
+\begin{tabularx}{\textwidth}{@{}lXlll@{}}
+\toprule
+\textbf{Resource} & \textbf{Create} & \textbf{Read} & \textbf{Update} & \textbf{Delete}\\
+\midrule
+User & \tb{POST /api/users} & \tb{GET} & \tb{PATCH} & \tb{DELETE}\\
+Rating & \tb{PUT .../ratings/:titleId} & list, one & \tb{PUT} again & \tb{DELETE}\\
+Bookmark & \tb{PUT .../bookmarks/titles/:titleId} & list, one & -- & \tb{DELETE}\\
+Genre preference & \tb{PUT .../genres/:genreId} & list, one & -- & \tb{DELETE}\\
+Search history entry & saved by a logged-in search & list & -- & one or all\\
+\bottomrule
+\end{tabularx}
+\caption{Operations on the framework data.}
+\label{tab:crud}
+\end{table}
+
+\subsection{Non-functional requirements}
+\begin{itemize}
+  \item \textbf{Passwords} are hashed with Argon2id before they reach the database. Argon2id adds a random salt to each hash and is deliberately slow and memory-intensive, which makes guessing expensive. Passwords need 8 to 128 characters and no composition rules, following NIST SP~800-63B. E-mails are stored in lowercase, so the same address cannot be registered twice with different case.
+  \item \textbf{Bounded work.} Every list is paged with at most 100 items, search texts are limited to 200 characters, a keyword search to 10 words of at most 60 characters, passwords to 128 characters and comments to 2000.
+  \item \textbf{Least privilege.} The role for the API is defined in \tb{G1_app_role.sql}: it can read every table, write only the framework tables and the two rating tables that \tb{rate()} changes, and execute the functions, but it cannot create, alter or drop anything. Creating it needs the CREATEROLE privilege, which the group account lacks, so it is waiting for the course administrator; until then the API connects as the owner of the database.
+  \item \textbf{No internal details} reach the client (see Section~\ref{sec:errhand}).
+\end{itemize}
+
+\subsection{Derived requirements}
+The application design of Subproject~1 was restated as user stories for two kinds of user: a visitor, who can search and browse, and a registered user, who can also rate, bookmark, keep a search history and choose favourite genres. They are listed in Appendix~\ref{app:stories}. Most stories need only the required functionality. Three kinds of operation go beyond it, because the stories need them:
+\begin{itemize}
+  \item \textbf{Genres and rating in a title.} The title page shows them, so \tb{GET /api/titles/:id} embeds both. They are small and bounded, so embedding them costs little.
+  \item \textbf{The list of genres} (\tb{GET /api/genres}), which the frontend needs to offer the genres as choices for favourites.
+  \item \textbf{A single rating, bookmark or genre preference} (\tb{GET .../ratings/:titleId} and similar), so that a title or person page can show the user's own rating and the state of the bookmark button without paging through the whole list.
+\end{itemize}
+Three stories were dropped: the alternative titles of a title, the episodes of a series, and a preferred language and region. None of them is required, the application is complete without them, and the language and region would only decide which alternative title to show first.
+
+\section{API design}\label{sec:api}
+\subsection{Resource model and endpoints}
+URLs name resources, and the HTTP method is the action: a bookmark is removed with \tb{DELETE /api/users/7/bookmarks/titles/tt0052520}, not with \tb{POST /api/removeBookmark}. Collections have plural names, searches are query parameters on a collection, and data that belongs to one resource is a sub-resource of it.
+
+Not every table became a resource. Titles, people, genres and words are the entities a user looks for, so they are top-level resources. Users are a resource, and everything a user owns (ratings, bookmarks, genre preferences and search history) is a sub-resource of the user. Junction tables such as \tb{knowfor} and \tb{generes_title_basic}, lookup tables such as \tb{title_basic_type}, and the title rating are not resources of their own: they appear as fields of the resource they describe. Relationships whose lists can grow, such as the co-players of a person or the similar titles of a title, are sub-resources (\tb{/api/people/:id/co-players}), while the criteria of a search are query parameters (\tb{/api/titles?search=zone}).
+
+A user's own data lives under \tb{/api/users/:userId} rather than under \tb{/api/me}. With this choice a URI identifies the same resource for every caller, and the authorization rule (the token must belong to \tb{:userId}) becomes one middleware. Path ids are validated before the database is queried: titles must be \tb{tt} followed by 7 or 8 digits, people \tb{nm} followed by 7 or 8 digits, and other ids must be positive integers.
+
+\begin{table}[H]
+\centering\footnotesize
+\begin{tabularx}{\textwidth}{@{}>{\raggedright}p{2.3cm}l>{\raggedright\arraybackslash}Xl@{}}
+\toprule
+\textbf{Method} & \textbf{Path} & \textbf{Database function} & \textbf{Access}\\
+\midrule
+GET & \tb{/api/health} & -- & anyone\\
+GET & \tb{/api/titles?search=} & \tb{string_search}, \tb{add_search_history} & optional token\\
+GET & \tb{/api/titles?title=&plot=...} & \tb{structured_string_search}, \tb{add_search_history} & optional token\\
+GET & \tb{/api/titles?words=&match=} & \tb{exact_match_search}, \tb{any_match_search}, \tb{weights_search} & anyone\\
+GET & \tb{/api/titles/:id} & SQL in repository & anyone\\
+GET & \tb{/api/titles/:id/similar} & \tb{similarity_search} & anyone\\
+GET & \tb{/api/titles/:id/actors} & \tb{popular_actors_in_movie} & anyone\\
+GET & \tb{/api/people?name=} & \tb{search_names}, \tb{add_search_history} & optional token\\
+GET & \tb{/api/people/:id} & SQL in repository & anyone\\
+GET & \tb{/api/people/:id/co-players} & \tb{co_players} & anyone\\
+GET & \tb{/api/people/:id/words} & \tb{person_words} & anyone\\
+GET & \tb{/api/words?words=} & \tb{words_query} & anyone\\
+GET & \tb{/api/genres} & SQL in repository & anyone\\
+GET & \tb{/api/genres/:genreId} & SQL in repository & anyone\\
+POST & \tb{/api/users} & \tb{create_user} & anyone\\
+POST & \tb{/api/auth/login} & SQL in repository & anyone\\
+\midrule
+GET, PATCH, DELETE & \tb{U} & \tb{get_user}, \tb{update_user}, \tb{unrate} and \tb{delete_user} & same user\\
+GET, DELETE & \tb{U/search-history} & \tb{get_search_history}, \tb{clear_search_history} & same user\\
+DELETE & \tb{U/search-history/:entryId} & \tb{delete_search_history_entry} & same user\\
+GET & \tb{U/ratings} & \tb{get_rating_history} & same user\\
+GET, PUT, DELETE & \tb{U/ratings/:titleId} & SQL, \tb{rate} and \tb{set_rating_comment}, \tb{unrate} & same user\\
+GET & \tb{U/bookmarks/titles} & \tb{get_bookmarked_titles} & same user\\
+GET, PUT, DELETE & \tb{U/bookmarks/titles/:titleId} & SQL, \tb{bookmark_title}, \tb{remove_bookmark_title} & same user\\
+GET & \tb{U/bookmarks/people} & \tb{get_bookmarked_persons} & same user\\
+GET, PUT, DELETE & \tb{U/bookmarks/people/:personId} & SQL, \tb{bookmark_person}, \tb{remove_bookmark_person} & same user\\
+GET & \tb{U/genres} & \tb{get_genre_preferences} & same user\\
+GET, PUT, DELETE & \tb{U/genres/:genreId} & SQL, \tb{add_genre_preference}, \tb{remove_genre_preference} & same user\\
+\bottomrule
+\end{tabularx}
+\caption{Endpoints of the API. \tb{U} stands for \tb{/api/users/:userId}.}
+\label{tab:endpoints}
+\end{table}
+
+\tb{GET /api/titles} is one collection with three ways to search it: a text search (\tb{search}), a structured search on title, plot, characters and person names, and a keyword search on the word index (\tb{words}). A request uses exactly one of them, and combining them, or sending none, is a \tb{400}. In the structured search every field is optional, an empty field counts as not given, and a title must match every field that is given. The keyword search takes 1 to 10 words, and \tb{match} chooses between titles containing every word (\tb{exact}), titles containing any of them, most words first (\tb{any}), and titles ranked by the TF-IDF weights of Subproject~1 (\tb{ranked}, the default). \tb{GET /api/words} answers the same words with the words that occur most often in the matching titles, so a user can find better words to search with.
+
+\subsection{Methods and status codes}
+\begin{table}[H]
+\centering\small
+\begin{tabularx}{\textwidth}{@{}lX@{}}
+\toprule
+\textbf{Case} & \textbf{Answer}\\
+\midrule
+Read (\tb{GET}) & \tb{200} with the resource or a page.\\
+Register (\tb{POST}), where the server chooses the id & \tb{201} with the new user and a \tb{Location} header.\\
+Add a rating, bookmark or genre (\tb{PUT}) & \tb{200} with the resource, also when it already existed.\\
+Change the profile (\tb{PATCH}) & \tb{200} with the updated user.\\
+Delete (\tb{DELETE}) & \tb{204} with no body, or \tb{404} if there was nothing to delete.\\
+\midrule
+Invalid id, parameter or body & \tb{400}, with a message that names the field.\\
+Missing, invalid or expired token & \tb{401}, with the header \tb{WWW-Authenticate: Bearer}.\\
+Token of another user & \tb{403}.\\
+Unknown resource or route & \tb{404}.\\
+Username or e-mail already taken & \tb{409}, saying which one.\\
+Database unreachable (health check) & \tb{503}.\\
+Any other failure & \tb{500} with the message \tb{Internal server error}.\\
+\bottomrule
+\end{tabularx}
+\caption{Status codes.}
+\label{tab:status}
+\end{table}
+
+Ratings, bookmarks and genre preferences are added with \tb{PUT} because the client already knows their URI. \tb{PUT} is idempotent: sending it twice has the same effect as sending it once, so a client that retries after a network error never gets an error for a bookmark that already exists. This relies on the \tb{ON CONFLICT DO NOTHING} of the database functions. \tb{PUT} replaces the whole rating, so a new rating sent without a comment removes the old comment.
+
+\subsection{JSON representations}
+Responses are plain JSON objects. Every resource, and every element of a list, has a \tb{url} field with its URI, so a client follows links instead of building URIs itself. URIs are relative to the server (\tb{/api/titles/tt0052520}), so they remain valid behind any host name or proxy. A reference to another resource is an object with its \tb{url} and a label to display, never a bare id. Field names are camelCase, a missing value is always \tb{null} and never \tb{"N/A"} or an empty string, times are ISO~8601 strings in UTC, and neither the password nor its hash ever appears in a response.
+
+Small, bounded lists are embedded, such as the genres of a title. Lists that can grow are separate paged sub-resources that the resource links to, such as \tb{coPlayersUrl}, so no response contains an unpaged list. A single resource is sent without a wrapper:
+\begin{verbatim}
+GET /api/titles/tt0052520
+{ "url": "/api/titles/tt0052520", "id": "tt0052520",
+  "title": "The Twilight Zone", "type": "tvSeries", "isAdult": false,
+  "startYear": 1959, "endYear": 1964, "runtimeMinutes": 50,
+  "plot": "...", "posterUrl": "https://...",
+  "genres": ["Drama", "Fantasy", "Horror"],
+  "rating": { "average": 9, "votes": 109820 } }
+\end{verbatim}
+
+Plain JSON with \tb{url} fields was preferred over HAL or JSON:API. Those formats standardise links, but they wrap every resource in extra structure that the frontend would have to interpret.
+
+\subsection{Paging}
+Every list accepts \tb{page} and \tb{pageSize}. The default page size is 20 and the maximum is 100. A requested size above the maximum is replaced by the default, as the assignment prescribes, and the response states the size actually used. Every list is answered with the same envelope:
+\begin{verbatim}
+{ "items": [ { "url": "/api/titles/tt0052520", "id": "tt0052520",
+               "title": "The Twilight Zone" } ],
+  "page": 2, "pageSize": 20,
+  "prev": "/api/titles?search=zone&page=1&pageSize=20",
+  "next": "/api/titles?search=zone&page=3&pageSize=20" }
+\end{verbatim}
+\tb{prev} and \tb{next} keep every other query parameter, so following \tb{next} continues the same search, and they are \tb{null} where no such page exists. The repository calls the database function with \tb{p_limit = pageSize + 1} and \tb{p_offset = (page - 1) * pageSize}. If the extra row comes back, a next page exists, and the row is dropped before the response is sent. A total count is therefore not returned: on a broad text search it would require finding every match instead of stopping after one page. Page numbers were chosen over cursors because the database functions already take a limit and an offset, and because page numbers let the frontend jump to any page.
+
+\subsection{Error representation}
+Every error has the same shape and the matching status code:
+\begin{verbatim}
+{ "error": { "message": "Title tt9999999 not found" } }
+\end{verbatim}
+
+\section{Architecture}\label{sec:arch}
+\subsection{Technology}
+\begin{table}[H]
+\centering\small
+\begin{tabularx}{\textwidth}{@{}lX@{}}
+\toprule
+\textbf{Package} & \textbf{Purpose}\\
+\midrule
+\tb{express} 5 & HTTP routing and middleware. Errors thrown in asynchronous handlers are passed to the error handler automatically.\\
+\tb{pg} & Connection pool and parameterised queries.\\
+\tb{argon2} & Password hashing with Argon2id.\\
+\tb{jose} & Signing and verifying the JSON Web Tokens used for login.\\
+\tb{cors} & The cross-origin policy for the frontend.\\
+\tb{vitest}, \tb{supertest} & Test runner, and HTTP requests against the application without opening a port.\\
+\tb{@biomejs/biome} & Formatter and linter.\\
+\bottomrule
+\end{tabularx}
+\caption{Libraries used by the backend.}
+\label{tab:tech}
+\end{table}
+
+The configuration (database credentials, whether the database connection is encrypted with TLS, port, allowed origins and the token secret) is read once from \tb{backend/.env} and validated at startup. If a value is missing or invalid, for example a token secret shorter than 32 characters or a TLS setting other than \tb{true} or \tb{false}, the service refuses to start with a message that names the variable, rather than failing at the first request. TLS is off by default for a local PostgreSQL and on for the course server, where the server's certificate is also checked unless \tb{DB_SSL_VERIFY} turns that check off. On \tb{Ctrl+C} or \tb{SIGTERM} the server finishes the requests in progress and closes the database connections before it exits.
+
+\subsection{Layers}
+The backend follows a layered architecture with one layer per responsibility (Table~\ref{tab:layers}). A request passes down through route, controller, service and repository, and the rows returned by the database are converted to JSON by a mapper on the way back. A layer may only call the layer below it: controllers never import a repository, and repositories know nothing of HTTP. The style is close to Model-View-Controller without the view, since the client renders the JSON. It departs from a strict layering in one place: \tb{lib/}, \tb{mappers/} and \tb{types/} are shared helpers that every layer may use.
+
+\begin{table}[H]
+\centering\small
+\begin{tabularx}{\textwidth}{@{}lX@{}}
+\toprule
+\textbf{Layer} & \textbf{Responsibility}\\
+\midrule
+\tb{routes/} & Maps a URL and method to a controller, with one router per resource, so the URL structure mirrors the resource model.\\
+\tb{controllers/} & Validates path, query and body, calls the service and sends the response. Controllers contain no SQL and no business rules.\\
+\tb{services/} & Business rules: which checks precede an operation, which operations form one transaction, and when a missing row is a \tb{404}.\\
+\tb{repositories/} & All SQL. Every query is parameterised (\tb{$1}, \tb{$2}, \ldots), so input is never concatenated into SQL.\\
+\tb{mappers/} & Converts a database row into the JSON representation, including the \tb{url} fields.\\
+\tb{middleware/} & Code that runs for every request: CORS, authentication, authorization, the 404 handler and the error handler.\\
+\tb{lib/}, \tb{db/}, \tb{config/} & Shared helpers (paging, ids, tokens, passwords, words), the connection pool and the transaction helper, and the configuration.\\
+\bottomrule
+\end{tabularx}
+\caption{Layers of the backend.}
+\label{tab:layers}
+\end{table}
+
+The directory structure mirrors the layers, with one file per resource in each layer, so all the code for ratings is found as \tb{rating.routes.ts}, \tb{rating.controller.ts}, \tb{rating.service.ts}, \tb{rating.repository.ts}, \tb{rating.mapper.ts} and \tb{types/rating.ts}:
+\begin{verbatim}
+backend/
+  src/
+    app.ts  server.ts        the Express application, and its start
+    routes/ controllers/ services/ repositories/ mappers/
+    types/                   row and JSON types of each resource
+    middleware/              CORS, authentication, errors
+    lib/ db/ config/         helpers, pool and transactions, settings
+  test/                      unit, repository and API tests
+\end{verbatim}
+
+\subsection{Allocation of logic}\label{sec:alloc}
+Each rule is placed where it can be enforced most reliably and tested most easily (Table~\ref{tab:alloc}). As a rule, what concerns the consistency of the data is in PostgreSQL, so it holds for every client, including the test script of Subproject~1, and what depends on HTTP, on the caller or on a library is in TypeScript.
+
+\begin{table}[H]
+\centering\small
+\begin{tabularx}{\textwidth}{@{}>{\raggedright}p{4.2cm}l>{\raggedright\arraybackslash}X@{}}
+\toprule
+\textbf{Rule} & \textbf{Where} & \textbf{Why}\\
+\midrule
+Searches, rankings, similarity and word weights & database & Performance: the work runs next to the data and its indexes, and only one page of results crosses the network.\\
+A rating is 1 to 10, one per user and title; averages and name ratings follow every vote & database & Consistency: \tb{rate()}, a \tb{CHECK} constraint and the trigger keep the averages right for any caller, in one statement.\\
+Unique username and e-mail & database & Only a \tb{UNIQUE} constraint is safe against two simultaneous requests. The repository turns its violation into a \tb{409}.\\
+Adding a bookmark twice changes nothing & database & \tb{ON CONFLICT DO NOTHING} is atomic, so there is no check-then-insert race.\\
+Password hashing and password rules & backend & The plain password must never reach the database, and PostgreSQL has no Argon2id. A library is easy to test in isolation.\\
+Validation of ids, lengths and keywords & backend & Gives a \tb{400} that names the field before any query runs, and is unit-tested without a database.\\
+Only the owner reaches a user's data & backend & The caller's identity is in the token, which the database never sees.\\
+When a search is saved to the history & backend & It depends on HTTP concepts: page~1, a token, and the kind of search.\\
+Deleting a user removes their votes first & backend & Composes the existing \tb{unrate()} and \tb{delete_user()} in one transaction instead of duplicating the rating arithmetic in a new function.\\
+\bottomrule
+\end{tabularx}
+\caption{Where each rule is enforced.}
+\label{tab:alloc}
+\end{table}
+
+Some rules are checked on both sides. The backend rejects a rating of 11 with a \tb{400} and a clear message, and \tb{rate()} rejects it again, so the database stays consistent even when it is used without the API. For maintainability, the rules that only the database enforces are tested through the API, so a change to a function in the SQL scripts that breaks the API makes a test fail.
+
+\subsection{Data access}\label{sec:dataaccess}
+All SQL is in \tb{repositories/}, one module per resource. A repository exports plain asynchronous functions, such as \tb{findRating(db, userId, tconst)} or \tb{rateTitle(db, userId, tconst, rating)}. Each takes the connection to use as its first parameter, and returns typed rows (\tb{RatingRow}), \tb{undefined} for a missing row, or a \tb{boolean} for ``changed or not''. This is the interface that the services see.
+
+Above the repositories, nothing sees SQL, table or column names, or the error codes of the driver. Repositories translate the only expected database error, a violated unique constraint, into a domain error (\tb{DuplicateUserError}) that names the field. A service sees which rows exist and whether an operation took effect, and decides what that means: a missing row is a \tb{404}, an existing user with no rating is a \tb{404} with another message. Controllers see neither the repositories nor the pool, only the services. In the other direction, repositories cannot see the request, the token or HTTP status codes.
+
+\subsection{Mapping}\label{sec:mapping}
+For every resource, \tb{types/} declares two TypeScript types: the row as the driver returns it (\tb{TitleRow}, with the column names of the database) and the representation the API sends (\tb{TitleDto}). A mapper is a pure function from one to the other, such as \tb{toTitleDto(row)}, so it can be tested without a database.
+\begin{itemize}
+  \item \textbf{Columns to fields.} Column names become camelCase field names (\tb{startyear} becomes \tb{startYear}), and some are renamed to say what they mean to a client: \tb{primarytitle} becomes \tb{title}, and the \tb{freq} of \tb{co_players()} becomes \tb{sharedTitles}. Every mapper adds the \tb{url} field from the id, using one URL function per resource (\tb{titleUrl}, \tb{personUrl}), so a URI is built in one place only.
+  \item \textbf{Nullable columns} become \tb{null}. The OMDb data stores \tb{"N/A"} or an empty string for an unknown plot or poster, and the mapper turns those into \tb{null} as well, so a client has one case to handle. A title without votes has no \tb{title_ratings} row, so both rating columns are \tb{null}, and the mapper sends \tb{"rating": null} rather than an average without votes.
+  \item \textbf{Joined data.} Columns that describe one related thing become a nested object, such as \tb{rating} with \tb{average} and \tb{votes}. A small set from another table becomes an array: the genres of a title are collected by an \tb{ARRAY(...)} subquery in the same query and sent as a list of names. A person is built from three queries (the person, the professions and the known-for titles), which the mapper combines into one object. Everything else stays flat.
+\end{itemize}
+A mapper never copies a field it was not told to copy, so a row that happens to contain the password hash cannot leak it.
+
+\subsection{Supply of dependencies}\label{sec:deps}
+Dependencies are supplied in two ways. Modules that exist once per process, the configuration and the connection pool, are ES modules that any file can import: \tb{config/index.ts} reads and validates \tb{.env} once when it is first imported, and \tb{db/pool.ts} creates the pool from it. The connection that a query uses is passed as a parameter instead. A service imports the pool and hands it, or the client of a transaction, to each repository function as its first argument (type \tb{Queryable}, either the pool or one client). This is what makes transactions possible without a container: the service decides which connection the queries share, and the repository does not know whether it runs inside a transaction.
+
+Express offers no dependency injection container, and a third-party one would add configuration and indirection for a small application with one database. Module imports give each dependency exactly once with no extra code. The parameter passes the one dependency that varies per call. Where a test needs a fake, the function takes the dependency as a parameter with the real one as default: \tb{withTransaction(work, source = pool)} is tested with a fake connection that fails on demand. The price is that the API tests use the real pool, so they need a database.
+
+\subsection{Authentication mechanism}
+Login (\tb{POST /api/auth/login}) checks the password and returns a JSON Web Token (JWT) together with the user. A JWT is a small JSON payload, here the user id and an expiry time, signed with HS256 and a secret key that only the server knows. The client sends the token in the header \tb{Authorization: Bearer <token>} on every request. The server checks the signature and the expiry without storing anything, which keeps the service stateless. A header also works across origins without cookies. Server sessions were rejected because the server would have to keep state, and HTTP Basic authentication because it sends the password with every request. A token expires after one hour, which limits the main drawback of JWTs: a token cannot be revoked before it expires.
+
+\subsection{Cross-cutting concerns}
+CORS, body parsing, the handling of unknown routes and of errors apply to every request, so they are middleware registered once in \tb{app.ts}. Authentication and authorization apply to groups of routes, so they are middleware attached to routers. Validation differs per endpoint and stays in the controllers. The middleware runs in this order:
+\begin{enumerate}
+  \item \textbf{CORS}, first, so every response carries its headers, including the \tb{400} and \tb{404} errors. Otherwise the browser would hide those answers from the frontend behind a network error. It also answers the preflight \tb{OPTIONS} requests before they reach the 404 handler.
+  \item \textbf{JSON body parsing}, so the routes receive a parsed body. A malformed body raises an error here, which the error handler answers as a \tb{400}.
+  \item \textbf{The routes}, with \tb{authenticate} and then \tb{authorizeSelf} on the routers of a user's data. Because the token is checked before the id, an anonymous caller gets a \tb{401} and learns nothing about which users exist.
+  \item \textbf{The 404 handler} for any request that no route matched.
+  \item \textbf{The error handler}, last, so every error thrown above, in any layer, reaches it.
+\end{enumerate}
+The tests import the application from \tb{app.ts}, so they exercise the same middleware chain as the running server.
+
+\section{Implementation}\label{sec:impl}
+\subsection{Routing, validation and queries}
+Each resource has its own router, mounted under \tb{/api} in \tb{routes/index.ts}, so the routing reflects the resource model of Table~\ref{tab:endpoints}. Path and query parameters are parsed by shared functions (\tb{parseTitleId}, \tb{parsePageRequest}, \ldots) that throw a \tb{400} naming the parameter before any query runs. Connections come from the single pool of Section~\ref{sec:deps}, which keeps at most ten open, and every value from a client is passed to \tb{pg} as a query parameter.
+
+\subsection{Changes to the database for the API}
+The functions of Subproject~1 were written to be called by hand. Calling them from a web service on every request exposed four problems, which were fixed in the scripts (listed in \tb{database/CHANGES.md}):
+\begin{itemize}
+  \item \textbf{Side effects on reads.} The searches wrote to \tb{history} themselves, so a \tb{GET} changed data, every page of results was logged again, and a search required a user. They no longer take a user id. The new function \tb{add_search_history()} records a search, and the backend calls it once per search, for page~1 and logged-in users only. As in Subproject~1, the text, structured and name searches are recorded, and the keyword search is not: it is a tool to refine a search, not something a user returns to.
+  \item \textbf{No paging.} Every function that returns a list takes \tb{p_limit} and \tb{p_offset}, and every order has a tiebreaker on the id, so a row never appears on two pages.
+  \item \textbf{Ambiguous identifiers.} \tb{co_players()} and the frequent-words function (renamed \tb{person_words()}) take an \tb{nconst} instead of a name, because names are not unique.
+  \item \textbf{No feedback.} Functions that returned \tb{VOID} now return \tb{BOOLEAN}, so the API can tell ``created'' from ``already there'' and ``deleted'' from ``not found''.
+\end{itemize}
+New functions were added for operations the API needs: \tb{get_user}, \tb{update_user}, \tb{unrate}, \tb{set_rating_comment}, \tb{delete_search_history_entry}, \tb{clear_search_history} and the genre preference functions. \tb{rate()} now rejects values outside 1--10 itself and creates the \tb{title_ratings} row on a title's first vote. Before, that vote was lost. The name rating trigger now fires after \tb{INSERT}, \tb{UPDATE} and \tb{DELETE} and counts each title once per person. \tb{history} received a surrogate key \tb{historyid}, because \tb{(userid, time)} was not unique within one transaction. Finally, the B-tree index on \tb{name_basics(primaryname)} was replaced by trigram indexes (\tb{pg_trgm}) on the person name and the title, which support \texttt{ILIKE '\%text\%'}.
+
+\subsection{Authentication and authorization middleware}
+Authentication and authorization are separate middlewares:
+\begin{itemize}
+  \item \tb{authenticate} verifies the token and records the caller. It answers \tb{401} when the token is missing, invalid or expired.
+  \item \tb{authenticateOptional} is used on the searches, which work for anyone but are saved to the history for a logged-in user. A token that is sent must still be valid, otherwise a client whose user has been logged out would silently get anonymous searches.
+  \item \tb{authorizeSelf} runs after \tb{authenticate} on everything under \tb{/api/users/:userId} and answers \tb{403} when the token belongs to another user. It is attached once to the router of a user's data, so a new endpoint cannot forget it.
+\end{itemize}
+
+A wrong username and a wrong password give the same \tb{401} with the same message. A login with an unknown username is checked against a dummy hash, so it takes as long as a wrong password, and response times do not reveal which usernames exist. A user who is deleted after logging in still has a valid token. Operations that load or change that user then answer \tb{401}, because the token no longer identifies anyone.
+
+\subsection{Transactions}
+Operations that consist of several database calls run in one transaction. A transaction belongs to one database connection, so \tb{withTransaction()} borrows one client from the pool, sends \tb{BEGIN}, runs the work, and sends \tb{COMMIT}, or \tb{ROLLBACK} if anything throws. The repository functions take the client as their first parameter, so the same function works inside a transaction and on its own. The following operations use transactions:
+\begin{itemize}
+  \item \textbf{Rating with a comment.} \tb{rate()} and \tb{set_rating_comment()} are two calls. If the second fails, the rollback also undoes the change to \tb{title_ratings} and the change the trigger made to \tb{name_ratings}.
+  \item \textbf{Deleting a user.} The cascade of \tb{delete_user()} removes the user's rows but would leave their votes in the averages. The service therefore first calls \tb{unrate()} for every rating of the user and then \tb{delete_user()}, all in one transaction.
+  \item \textbf{Changing the profile.} The update and the read of the result run together, so the answer shows exactly this change. Unique usernames and e-mails are decided by the \tb{UNIQUE} constraints rather than by a check before the update, so two simultaneous claims give one \tb{200} and one \tb{409}, never a \tb{500}.
+\end{itemize}
+Rating and deleting a user first lock the user's row with \tb{SELECT ... FOR NO KEY UPDATE}. Without the lock, two identical rating requests at the same moment (a double click) would both see no earlier rating, both add a vote, and the second would fail on the primary key of \tb{rating_history}. With the lock, the second request waits and then updates the first rating. The same query also detects a user who was deleted after logging in.
+
+\subsection{Central error handling}\label{sec:errhand}
+Services and controllers throw error classes that carry a status code (\tb{BadRequestError}, \tb{NotFoundError}, \ldots). One error handler, the last middleware, turns them into responses, so no controller repeats error handling. Any other error is a bug or an infrastructure failure: the stack trace and the SQL error are written to the server log, and the client only receives a \tb{500} with a generic message.
+
+\subsection{Cross-origin requests}
+The frontend is served from another origin than the API, so the browser only lets it read responses if the API allows that origin. Only the origins listed in the configuration are allowed (by default the development server \tb{http://localhost:5173}), not every origin. The allowed headers are \tb{Content-Type} and \tb{Authorization}, the header \tb{Location} is exposed so the frontend can read the URI of a new user, and credentials mode stays off because the token is not a cookie. CORS only restricts browsers and is not a security boundary: authentication is.
+
+\section{Testing}\label{sec:betest}
+The tests are written with Vitest and run with \tb{npm test}: 344 tests in 26 files, all passing. Each kind of component is tested with at least one representative:
+\begin{itemize}
+  \item \textbf{Unit tests} cover the logic that does not touch the database: paging, tokens, the parsing of keyword lists, the transaction helper (with a fake connection), the mappers and the middleware.
+  \item \textbf{Repository tests} call the SQL of a repository directly, inside a transaction that is rolled back at the end, so repeated runs give the same result.
+  \item \textbf{API tests} (\tb{*.api.test.ts}) send real HTTP requests through \tb{supertest} to the application of \tb{app.ts}, without starting a server, and check the status code, the body and the headers of each endpoint, including every error case of Table~\ref{tab:status}. They include reads of IMDb data, writes of framework data, paged listings and requests rejected as unauthorised.
+  \item \textbf{Transaction tests} make the second step of an operation fail and check that nothing was stored, for example that a new rating is gone and the title's average is unchanged.
+\end{itemize}
+Tests that write remove what they created. Ratings change IMDb data (\tb{title_ratings}), so the tests only rate titles that had no rating, withdraw every test vote before deleting the test users, and finally check that those titles are unrated again.
+
+\subsection{How the tests show that the requirements are met}
+Table~\ref{tab:reqtests} names, for each requirement of Section~\ref{sec:req}, a test that demonstrates it.
+
+\begin{table}[H]
+\centering\footnotesize
+\begin{tabularx}{\textwidth}{@{}>{\raggedright}p{3.6cm}>{\raggedright\arraybackslash}X@{}}
+\toprule
+\textbf{Requirement} & \textbf{Test file: what it checks}\\
+\midrule
+Functionality reachable & One API test file per resource, for example \tb{titles-search.api.test.ts}, \tb{people.api.test.ts}, \tb{ratings.api.test.ts}.\\
+IMDb data read-only & \tb{titles-word-search.api.test.ts}: ``only supports GET: the word index is read-only''.\\
+Framework CRUD & \tb{users.api.test.ts}, \tb{user-update.api.test.ts}, \tb{user-delete.api.test.ts}, \tb{bookmarks.api.test.ts}, \tb{genres.api.test.ts}, \tb{search-history.api.test.ts}.\\
+URIs instead of ids & \tb{title.mapper.test.ts}, \tb{bookmark.mapper.test.ts}: ``gives the bookmark its own URL and links to the title''.\\
+Paging & \tb{paging.test.ts}: ``applies the default, not the maximum, when the size is above the maximum''; \tb{titles-search.api.test.ts}: ``following the next links visits every match exactly once''.\\
+Salted password hashes & \tb{users.api.test.ts}: ``stores the password as an Argon2id hash, never as plain text''; \tb{user.mapper.test.ts}: ``never copies the password hash''.\\
+No internal details in errors & \tb{ratings-transaction.api.test.ts}: a failing query answers only \tb{Internal server error}; \tb{api.test.ts}: a malformed body is a \tb{400}, not a \tb{500}.\\
+Authentication and authorization & Every user resource: ``answers 401 without a token on every route'' and ``answers 403 for another user''.\\
+Transactions & \tb{ratings-transaction.api.test.ts}, \tb{user-delete-transaction.api.test.ts}, \tb{transaction.test.ts}.\\
+Cross-origin policy & \tb{cors.api.test.ts}.\\
+\bottomrule
+\end{tabularx}
+\caption{Requirements and the tests that demonstrate them.}
+\label{tab:reqtests}
+\end{table}
+
+\section{Evaluation}\label{sec:beeval}
+\begin{itemize}
+  \item The text search orders its results by title, not by relevance, so a search for ``twilight zone'' lists episodes before the series itself. Ordering title matches before plot matches, or by number of votes, would be a change to \tb{string_search}.
+  \item Search history stores only the search text, not the titles and people it found, so a past search is repeated rather than reopened.
+  \item A token cannot be revoked before it expires. Logging out deletes it on the client only.
+  \item The tests share the course database with the running application, so a test can fail when someone else changes that database at the same time. A separate test database would remove this dependency.
+\end{itemize}
+
+\clearpage
+\appendix
+\renewcommand{\thesection}{\Alph{section}}
+\section{User stories}\label{app:stories}
+A visitor is anyone who uses the application without logging in; a user is a visitor who registered and logged in, and can do everything a visitor can.
+
+\begin{table}[H]
+\centering\footnotesize
+\begin{tabularx}{\textwidth}{@{}l>{\raggedright}X>{\raggedright\arraybackslash}p{4.6cm}@{}}
+\toprule
+\textbf{Id} & \textbf{Story} & \textbf{Endpoints}\\
+\midrule
+S1 & As a visitor, I want to search titles by a word from their name or plot. & \tb{GET /api/titles?search=}\\
+S2 & As a visitor, I want to search by title, plot, character and actor at the same time. & \tb{GET /api/titles?title=&plot=...}\\
+S3 & As a visitor, I want to search for people by name. & \tb{GET /api/people?name=}\\
+S4 & As a visitor, I want to search with several keywords and choose all, any or ranked. & \tb{GET /api/titles?words=&match=}\\
+S5 & As a visitor, I want to see which words often appear with my keywords. & \tb{GET /api/words?words=}\\
+S6 & As a visitor, I want long result lists split into pages. & \tb{?page=&pageSize=}\\
+T1 & As a visitor, I want a title page with poster, plot, year, runtime, genres and rating. & \tb{GET /api/titles/:id}\\
+T2 & As a visitor, I want to see the most popular actors of a title. & \tb{GET /api/titles/:id/actors}\\
+T3 & As a visitor, I want to see titles similar to the one I am looking at. & \tb{GET /api/titles/:id/similar}\\
+P1 & As a visitor, I want a person page with professions, rating and known-for titles. & \tb{GET /api/people/:id}\\
+P2 & As a visitor, I want to see the actors a person has worked with most often. & \tb{GET /api/people/:id/co-players}\\
+P3 & As a visitor, I want to see the words most typical of a person's titles. & \tb{GET /api/people/:id/words}\\
+A1 & As a visitor, I want to register with a username, e-mail and password. & \tb{POST /api/users}\\
+A2 & As a user, I want to log in. & \tb{POST /api/auth/login}\\
+A3 & As a user, I want to log out. & none: the client deletes its token\\
+A4 & As a user, I want to see and change my profile. & \tb{GET}, \tb{PATCH U}\\
+A5 & As a user, I want to delete my account and all my data. & \tb{DELETE U}\\
+R1, R2 & As a user, I want to rate a title from 1 to 10, with a comment, and change my mind later. & \tb{PUT U/ratings/:titleId}\\
+R3 & As a user, I want to see my own rating on a title page. & \tb{GET U/ratings/:titleId}\\
+R4 & As a user, I want a list of everything I have rated. & \tb{GET U/ratings}\\
+R5 & As a user, I want to remove a rating. & \tb{DELETE U/ratings/:titleId}\\
+B1--B4 & As a user, I want to bookmark titles and people, list my bookmarks, see whether I bookmarked something, and remove a bookmark. & \tb{U/bookmarks/titles}, \tb{U/bookmarks/people}\\
+H1 & As a user, I want my searches saved automatically. & done by the searches\\
+H2 & As a user, I want to see my past searches, newest first. & \tb{GET U/search-history}\\
+H3 & As a user, I want to delete one search or my whole history. & \tb{DELETE U/search-history}\\
+G1, G2 & As a user, I want to choose and see my favourite genres. & \tb{GET /api/genres}, \tb{U/genres}\\
+\bottomrule
+\end{tabularx}
+\caption{User stories. \tb{U} stands for \tb{/api/users/:userId}. The dropped stories (alternative titles, episodes, language and region) are left out.}
+\label{tab:stories}
+\end{table}
+
+\end{document}
